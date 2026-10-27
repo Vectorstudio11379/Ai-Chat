@@ -39,10 +39,16 @@ const PROVIDER_CONFIGS = {
     name: 'Google Gemini',
     envKey: 'GEMINI_API_KEY',
     url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
-    models: ['gemini-2.0-flash', 'gemini-1.5-pro', 'gemini-2.0-flash-lite'],
-    defaultModel: 'gemini-2.0-flash',
+    models: ['gemini-3.8-flash', 'gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'],
+    defaultModel: 'gemini-3.8-flash',
     speed: '220 t/s',
   },
+};
+
+const MODEL_ALIASES = {
+  'gemini-2.0-flash': 'gemini-3.8-flash',
+  'gemini-2.0-flash-lite': 'gemini-3.8-flash',
+  'gemini-2.0': 'gemini-3.8-flash',
 };
 
 export function createRouter({ env = process.env, fetchFn = globalThis.fetch } = {}) {
@@ -94,7 +100,10 @@ export function createRouter({ env = process.env, fetchFn = globalThis.fetch } =
       return;
     }
 
-    const requestedModel = (body.model || '').toLowerCase();
+    let requestedModel = (body.model || '').toLowerCase();
+    if (MODEL_ALIASES[requestedModel]) {
+      requestedModel = MODEL_ALIASES[requestedModel];
+    }
     // Sort providers so if a requested model matches a specific provider, that provider goes first
     const prioritized = [...available].sort((a, b) => {
       const aHas = a.models.some(m => m.toLowerCase().includes(requestedModel));
