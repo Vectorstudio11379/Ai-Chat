@@ -18,6 +18,10 @@ services:
         sync: false
       - key: CEREBRAS_API_KEY
         sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: COHERE_API_KEY
+        sync: false
       - key: GEMINI_API_KEY
         sync: false
       - key: ENCRYPTION_KEY

@@ -15,6 +15,26 @@ const PROVIDER_CONFIGS = {
     defaultModel: 'llama-3.3-70b',
     speed: '450 t/s',
   },
+  openrouter: {
+    name: 'OpenRouter',
+    envKey: 'OPENROUTER_API_KEY',
+    url: 'https://openrouter.ai/api/v1/chat/completions',
+    models: [
+      'deepseek/deepseek-r1:free',
+      'meta-llama/llama-3.3-70b-instruct:free',
+      'qwen/qwen-2.5-coder-32b-instruct:free'
+    ],
+    defaultModel: 'deepseek/deepseek-r1:free',
+    speed: 'Free Hub',
+  },
+  cohere: {
+    name: 'Cohere',
+    envKey: 'COHERE_API_KEY',
+    url: 'https://api.cohere.com/v2/chat',
+    models: ['command-r-plus-08-2024', 'command-r-08-2024', 'command-light'],
+    defaultModel: 'command-r-plus-08-2024',
+    speed: '250 t/s',
+  },
   gemini: {
     name: 'Google Gemini',
     envKey: 'GEMINI_API_KEY',
@@ -69,7 +89,7 @@ export function createRouter({ env = process.env, fetchFn = globalThis.fetch } =
     if (available.length === 0) {
       res.writeHead(503, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
-        error: 'No active AI providers found. Please configure GROQ_API_KEY, CEREBRAS_API_KEY, or GEMINI_API_KEY in environment variables.'
+        error: 'No active AI providers found. Please configure GROQ_API_KEY, CEREBRAS_API_KEY, OPENROUTER_API_KEY, COHERE_API_KEY, or GEMINI_API_KEY in environment variables.'
       }));
       return;
     }
@@ -90,6 +110,16 @@ export function createRouter({ env = process.env, fetchFn = globalThis.fetch } =
       const apiKey = env[provider.envKey];
       const modelToUse = provider.models.includes(requestedModel) ? requestedModel : provider.defaultModel;
 
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey.trim()}`,
+      };
+
+      if (provider.id === 'openrouter') {
+        headers['HTTP-Referer'] = 'https://freellmapi-studio.onrender.com';
+        headers['X-Title'] = 'FreeLLM Studio';
+      }
+
       const payload = {
         model: modelToUse,
         messages: body.messages.map(m => ({
@@ -103,10 +133,7 @@ export function createRouter({ env = process.env, fetchFn = globalThis.fetch } =
       try {
         const upstreamRes = await fetchFn(provider.url, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey.trim()}`,
-          },
+          headers,
           body: JSON.stringify(payload),
         });
 

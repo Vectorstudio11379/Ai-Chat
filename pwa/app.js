@@ -161,6 +161,16 @@ function renderProviderPills(providers) {
     pillGemini.querySelector('.p-speed').textContent = providers.gemini.available ? 'Active' : 'Offline';
     pillGemini.querySelector('.p-speed').style.color = providers.gemini.available ? '#3b82f6' : '#71717a';
   }
+  const pillOpenRouter = document.getElementById('pill-openrouter');
+  if (pillOpenRouter && providers.openrouter) {
+    pillOpenRouter.querySelector('.p-speed').textContent = providers.openrouter.available ? providers.openrouter.speed : 'Offline';
+    pillOpenRouter.querySelector('.p-speed').style.color = providers.openrouter.available ? '#8b5cf6' : '#71717a';
+  }
+  const pillCohere = document.getElementById('pill-cohere');
+  if (pillCohere && providers.cohere) {
+    pillCohere.querySelector('.p-speed').textContent = providers.cohere.available ? providers.cohere.speed : 'Offline';
+    pillCohere.querySelector('.p-speed').style.color = providers.cohere.available ? '#f59e0b' : '#71717a';
+  }
 }
 
 // Effective same-origin base URL to prevent HTTP 405 Method Not Allowed
