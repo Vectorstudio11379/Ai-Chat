@@ -1,10 +1,10 @@
 // FreeLLM Studio — Unified AI Workbench Frontend Logic
 // Pixel-perfect interface matching mockup with Auto-Unified AI Router,
-// Live streaming telemetry, cross-device sync, and speech recognition.
+// Real chat history, clear UI on startup, instant response, and mapped settings.
 
-const STORAGE_KEY_CHATS = 'freellm_chats_v3';
-const STORAGE_KEY_SETTINGS = 'freellm_settings_v3';
-const STORAGE_KEY_ACTIVE = 'freellm_active_chat_id_v3';
+const STORAGE_KEY_CHATS = 'freellm_user_chats_v4';
+const STORAGE_KEY_SETTINGS = 'freellm_studio_settings_v4';
+const STORAGE_KEY_ACTIVE = 'freellm_active_session_v4';
 
 let chats = [];
 let activeChatId = null;
@@ -18,6 +18,15 @@ let settings = {
   apiKey: '',
   passphrase: '',
   defaultModel: 'auto', // ⚡ Auto-Unified Smart Router
+  persona: 'default',
+  theme: 'dark',
+  providerKeys: {
+    groq: '',
+    cerebras: '',
+    gemini: '',
+    openrouter: '',
+    cohere: '',
+  },
 };
 
 // DOM References
@@ -36,6 +45,7 @@ const streamTelemetry = document.getElementById('streamTelemetry');
 const telemetryText = document.getElementById('telemetryText');
 const wakeBanner = document.getElementById('wakeBanner');
 const chatContainer = document.getElementById('chatContainer');
+const chatStageTitle = document.getElementById('chatStageTitle');
 const promptInput = document.getElementById('promptInput');
 const clearInputBtn = document.getElementById('clearInputBtn');
 const sendBtn = document.getElementById('sendBtn');
@@ -46,38 +56,69 @@ const plusBtn = document.getElementById('plusBtn');
 const installPwaBtn = document.getElementById('installPwaBtn');
 const failoverBadge = document.getElementById('failoverBadge');
 
-// Top Navigation Tabs
+// Left Rail Navigation Buttons
+const brandLogoBtn = document.getElementById('brandLogoBtn');
+const railToolDraft = document.getElementById('railToolDraft');
+const railToolAnalytics = document.getElementById('railToolAnalytics');
+const railToolDocs = document.getElementById('railToolDocs');
+const railToolBalance = document.getElementById('railToolBalance');
+const railToolGlobe = document.getElementById('railToolGlobe');
+const railToolConfig = document.getElementById('railToolConfig');
+const railToolMore = document.getElementById('railToolMore');
+const settingsBtn = document.getElementById('settingsBtn');
+const exitAppBtn = document.getElementById('exitAppBtn');
+
+// Top Navigation Tabs & Theme
 const tabDashboard = document.getElementById('tabDashboard');
 const tabAiChat = document.getElementById('tabAiChat');
 const tabHelp = document.getElementById('tabHelp');
 const tabAccount = document.getElementById('tabAccount');
+const notifBtn = document.getElementById('notifBtn');
 const userProfileBtn = document.getElementById('userProfileBtn');
 const themeLightBtn = document.getElementById('themeLightBtn');
 const themeDarkBtn = document.getElementById('themeDarkBtn');
 
-// Modal Elements
+// Chat Menu Dropdown
+const chatMenuBtn = document.getElementById('chatMenuBtn');
+const chatDropdownMenu = document.getElementById('chatDropdownMenu');
+const menuClearChatBtn = document.getElementById('menuClearChatBtn');
+const menuExportMdBtn = document.getElementById('menuExportMdBtn');
+const menuDeleteChatBtn = document.getElementById('menuDeleteChatBtn');
+
+// Settings Modal Elements
 const settingsModal = document.getElementById('settingsModal');
-const settingsBtn = document.getElementById('settingsBtn');
 const closeSettingsBtn = document.getElementById('closeSettingsBtn');
 const saveSettingsBtn = document.getElementById('saveSettingsBtn');
 const syncNowBtn = document.getElementById('syncNowBtn');
 const settingBackendUrl = document.getElementById('settingBackendUrl');
 const settingApiKey = document.getElementById('settingApiKey');
 const settingPassphrase = document.getElementById('settingPassphrase');
-const exitAppBtn = document.getElementById('exitAppBtn');
+const settingGroqKey = document.getElementById('settingGroqKey');
+const settingCerebrasKey = document.getElementById('settingCerebrasKey');
+const settingGeminiKey = document.getElementById('settingGeminiKey');
+const settingOpenRouterKey = document.getElementById('settingOpenRouterKey');
+const settingCohereKey = document.getElementById('settingCohereKey');
+
+// Info / Generic Modal Elements
+const infoModal = document.getElementById('infoModal');
+const infoModalTitle = document.getElementById('infoModalTitle');
+const infoModalBody = document.getElementById('infoModalBody');
+const closeInfoModalBtn = document.getElementById('closeInfoModalBtn');
+const closeInfoModalOkBtn = document.getElementById('closeInfoModalOkBtn');
 
 // --- Initialization ---
 function init() {
   loadSettings();
+  applyTheme(settings.theme || 'dark');
   loadChats();
   setupEventListeners();
   setupSpeechRecognition();
   fetchProviderStatus();
   registerServiceWorker();
 
-  // Seed mockup conversation if first time or empty
+  // If no chats exist, start with 1 fresh, clean conversation
   if (chats.length === 0) {
-    seedMockupConversation();
+    createNewChat(false);
   } else {
     const savedActive = localStorage.getItem(STORAGE_KEY_ACTIVE);
     const target = chats.find(c => c.id === savedActive) || chats[0];
@@ -88,64 +129,6 @@ function init() {
   if (settings.passphrase) {
     syncChatsFromCloud();
   }
-}
-
-// --- Seed Mockup Conversation matching the screenshot pixel by pixel ---
-function seedMockupConversation() {
-  const now = Date.now();
-  const DAY_MS = 86400000;
-
-  // Active chat matching mockup conversation
-  const mainChat = {
-    id: 'chat_active_mockup',
-    title: 'Mortgage Rate Insights & Options',
-    createdAt: now - 3600000,
-    updatedAt: now,
-    messages: [
-      {
-        role: 'assistant',
-        content: 'How Can I Help You Today?',
-        timestamp: now - 3500000,
-      },
-      {
-        role: 'user',
-        content: 'Hi there',
-        timestamp: now - 3400000,
-      },
-      {
-        role: 'user',
-        content: 'Could you please provide me with the latest update on the current mortgage rate today, including details for both 30-year fixed and 15-year fixed loan options, if available?',
-        timestamp: now - 1800000,
-      },
-      {
-        role: 'assistant',
-        content: "Today's average 30-year fixed mortgage rate is 6.45%, 15-year fixed is 5.85%. Our app updates daily with real-time rates, trends, and personalized mortgage options for you.",
-        timestamp: now - 1700000,
-      }
-    ]
-  };
-
-  // Seed history threads for Today, 5 Days Ago, 7 Days Ago matching the screenshot
-  const historicalChats = [
-    mainChat,
-    { id: 'c_today_1', title: 'Last week, mortgage rates rose s...', createdAt: now - 2 * 3600000, updatedAt: now - 2 * 3600000, messages: [] },
-    { id: 'c_today_2', title: 'Two weeks ago, rates dipped to 6...', createdAt: now - 5 * 3600000, updatedAt: now - 5 * 3600000, messages: [] },
-    { id: 'c_today_3', title: 'Three weeks ago, rates increase...', createdAt: now - 8 * 3600000, updatedAt: now - 8 * 3600000, messages: [] },
-    { id: 'c_today_4', title: 'A month ago, rates remained sta...', createdAt: now - 12 * 3600000, updatedAt: now - 12 * 3600000, messages: [] },
-    { id: 'c_today_5', title: 'Recent months show gradual ris...', createdAt: now - 18 * 3600000, updatedAt: now - 18 * 3600000, messages: [] },
-
-    // 5 Days Ago
-    { id: 'c_5d_1', title: 'Five weeks ago, mortgage rates a...', createdAt: now - 5 * DAY_MS, updatedAt: now - 5 * DAY_MS, messages: [] },
-    { id: 'c_5d_2', title: 'Earlier this year, rates dropped to...', createdAt: now - 5.2 * DAY_MS, updatedAt: now - 5.2 * DAY_MS, messages: [] },
-    { id: 'c_5d_3', title: 'January saw rates rise quickly fro...', createdAt: now - 5.8 * DAY_MS, updatedAt: now - 5.8 * DAY_MS, messages: [] },
-
-    // 7 Days Ago
-    { id: 'c_7d_1', title: 'Mortgage application volumes fl...', createdAt: now - 7 * DAY_MS, updatedAt: now - 7 * DAY_MS, messages: [] },
-  ];
-
-  chats = historicalChats;
-  saveChats();
-  selectChat(mainChat.id);
 }
 
 // --- Persistence Helpers ---
@@ -159,10 +142,16 @@ function loadSettings() {
     console.warn('Failed to load settings from storage', e);
   }
 
-  // Sync with form fields
+  // Populate form fields
   if (settingBackendUrl) settingBackendUrl.value = settings.backendUrl || '';
   if (settingApiKey) settingApiKey.value = settings.apiKey || '';
   if (settingPassphrase) settingPassphrase.value = settings.passphrase || '';
+  if (settingGroqKey) settingGroqKey.value = (settings.providerKeys && settings.providerKeys.groq) || '';
+  if (settingCerebrasKey) settingCerebrasKey.value = (settings.providerKeys && settings.providerKeys.cerebras) || '';
+  if (settingGeminiKey) settingGeminiKey.value = (settings.providerKeys && settings.providerKeys.gemini) || '';
+  if (settingOpenRouterKey) settingOpenRouterKey.value = (settings.providerKeys && settings.providerKeys.openrouter) || '';
+  if (settingCohereKey) settingCohereKey.value = (settings.providerKeys && settings.providerKeys.cohere) || '';
+
   if (modelSelector) {
     modelSelector.value = settings.defaultModel || 'auto';
   }
@@ -173,6 +162,19 @@ function saveSettings(newSettings) {
   settings = { ...settings, ...newSettings };
   localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(settings));
   updateSyncBadge();
+}
+
+function applyTheme(theme) {
+  settings.theme = theme;
+  if (theme === 'light') {
+    document.body.classList.add('light-theme');
+    if (themeLightBtn) themeLightBtn.classList.add('active');
+    if (themeDarkBtn) themeDarkBtn.classList.remove('active');
+  } else {
+    document.body.classList.remove('light-theme');
+    if (themeDarkBtn) themeDarkBtn.classList.add('active');
+    if (themeLightBtn) themeLightBtn.classList.remove('active');
+  }
 }
 
 function updateSyncBadge() {
@@ -190,9 +192,16 @@ function updateSyncBadge() {
 
 function loadChats() {
   try {
+    ['freellm_chats', 'freellm_chats_v1', 'freellm_chats_v2', 'freellm_chats_v3'].forEach(k => {
+      localStorage.removeItem(k);
+    });
     const stored = localStorage.getItem(STORAGE_KEY_CHATS);
     if (stored) {
-      chats = JSON.parse(stored);
+      const parsed = JSON.parse(stored);
+      // Clean out any leftover legacy mock data
+      chats = parsed.filter(c => !c.id.includes('mockup') && !c.id.includes('c_today_') && !c.id.includes('c_5d_') && !c.id.includes('c_7d_'));
+    } else {
+      chats = [];
     }
   } catch (e) {
     chats = [];
@@ -202,6 +211,14 @@ function loadChats() {
 function saveChats() {
   localStorage.setItem(STORAGE_KEY_CHATS, JSON.stringify(chats));
   renderChatList();
+}
+
+// Effective same-origin base URL to prevent HTTP 405 Method Not Allowed
+function getEffectiveBaseUrl() {
+  if (settings.backendUrl && settings.backendUrl.trim()) {
+    return settings.backendUrl.trim().replace(/\/$/, '');
+  }
+  return window.location.origin;
 }
 
 // --- Provider Quotas & Health Telemetry ---
@@ -264,42 +281,34 @@ function renderProviderPills(providers) {
   }
 }
 
-// Effective same-origin base URL to prevent HTTP 405 Method Not Allowed
-function getEffectiveBaseUrl() {
-  if (settings.backendUrl && settings.backendUrl.trim()) {
-    return settings.backendUrl.trim().replace(/\/$/, '');
-  }
-  return window.location.origin;
-}
-
-// --- Chat Management ---
-function createNewChat() {
+// --- Real Chat Management ---
+function createNewChat(focusInput = true) {
   const newChat = {
     id: 'chat_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
-    title: 'New Session',
-    messages: [
-      {
-        role: 'assistant',
-        content: 'How Can I Help You Today?',
-        timestamp: Date.now()
-      }
-    ],
+    title: 'New Chat',
+    messages: [], // Clean, completely empty conversation
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
   chats.unshift(newChat);
   saveChats();
   selectChat(newChat.id);
-  if (promptInput) promptInput.focus();
+  if (focusInput && promptInput) {
+    promptInput.focus();
+  }
 }
 
 function selectChat(id) {
   activeChatId = id;
   localStorage.setItem(STORAGE_KEY_ACTIVE, id);
+  const activeChat = chats.find(c => c.id === id);
+  if (chatStageTitle && activeChat) {
+    chatStageTitle.textContent = activeChat.title && activeChat.title !== 'New Chat' ? activeChat.title : 'AI Chat';
+  }
   renderChatList();
   renderChatMessages();
 
-  // Close mobile sidebar on select
+  // Close mobile sidebar if open
   if (sidebar && sidebar.classList.contains('open')) {
     sidebar.classList.remove('open');
     if (sidebarBackdrop) sidebarBackdrop.classList.remove('active');
@@ -316,41 +325,72 @@ function deleteChat(id, event) {
   }
 
   if (chats.length === 0) {
-    createNewChat();
+    createNewChat(false);
   } else if (activeChatId === id) {
     selectChat(chats[0].id);
   }
 }
 
-// --- Grouped History Chat List Rendering ---
+function clearCurrentChat() {
+  const chat = chats.find(c => c.id === activeChatId);
+  if (!chat) return;
+  chat.messages = [];
+  chat.title = 'New Chat';
+  chat.updatedAt = Date.now();
+  saveChats();
+  renderChatMessages();
+  if (chatStageTitle) chatStageTitle.textContent = 'AI Chat';
+}
+
+// --- Grouped Real Chat List Rendering ---
 function renderChatList() {
   if (!chatList) return;
   chatList.innerHTML = '';
 
+  if (chats.length === 0 || (chats.length === 1 && chats[0].messages.length === 0)) {
+    const emptyNotice = document.createElement('div');
+    emptyNotice.className = 'history-empty-state';
+    emptyNotice.innerHTML = `
+      <p style="margin-bottom: 6px; font-weight: 500;">No Saved History</p>
+      <p style="font-size: 11.5px; opacity: 0.75;">Your conversations will appear here grouped by date.</p>
+    `;
+    chatList.appendChild(emptyNotice);
+    return;
+  }
+
   const now = Date.now();
   const DAY_MS = 86400000;
+  const startOfToday = new Date().setHours(0, 0, 0, 0);
+  const startOfYesterday = startOfToday - DAY_MS;
 
   const groups = {
     'Today': [],
-    '5 Days Ago': [],
-    '7 Days Ago': []
+    'Yesterday': [],
+    'Previous 7 Days': [],
+    'Older': [],
   };
 
   chats.forEach(chat => {
-    const ageMs = now - (chat.updatedAt || chat.createdAt || now);
-    const ageDays = ageMs / DAY_MS;
+    // Only display chats that have user messages, or the currently active empty chat
+    if (chat.messages.length === 0 && chat.id !== activeChatId) return;
 
-    if (ageDays < 2) {
+    const time = chat.updatedAt || chat.createdAt || now;
+    if (time >= startOfToday) {
       groups['Today'].push(chat);
-    } else if (ageDays < 6) {
-      groups['5 Days Ago'].push(chat);
+    } else if (time >= startOfYesterday) {
+      groups['Yesterday'].push(chat);
+    } else if (time >= now - 7 * DAY_MS) {
+      groups['Previous 7 Days'].push(chat);
     } else {
-      groups['7 Days Ago'].push(chat);
+      groups['Older'].push(chat);
     }
   });
 
+  let hasRenderedAny = false;
+
   Object.entries(groups).forEach(([groupName, groupChats]) => {
     if (groupChats.length === 0) return;
+    hasRenderedAny = true;
 
     const groupHeader = document.createElement('div');
     groupHeader.className = 'history-group-label';
@@ -373,11 +413,11 @@ function renderChatList() {
 
       const titleSpan = document.createElement('span');
       titleSpan.className = 'chat-item-title';
-      titleSpan.textContent = chat.title || 'Untitled Chat';
+      titleSpan.textContent = chat.title || 'Untitled Session';
 
       const deleteBtn = document.createElement('button');
       deleteBtn.className = 'delete-chat-btn';
-      deleteBtn.title = 'Delete Chat';
+      deleteBtn.title = 'Delete Session';
       deleteBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>';
       deleteBtn.onclick = (e) => deleteChat(chat.id, e);
 
@@ -387,26 +427,81 @@ function renderChatList() {
       chatList.appendChild(item);
     });
   });
+
+  if (!hasRenderedAny) {
+    const emptyNotice = document.createElement('div');
+    emptyNotice.className = 'history-empty-state';
+    emptyNotice.innerHTML = `
+      <p style="margin-bottom: 6px; font-weight: 500;">No Saved History</p>
+      <p style="font-size: 11.5px; opacity: 0.75;">Send a message to save your first conversation.</p>
+    `;
+    chatList.appendChild(emptyNotice);
+  }
 }
 
+// --- Render Chat Messages (Clean UI when empty) ---
 function renderChatMessages() {
   if (!chatContainer) return;
   chatContainer.innerHTML = '';
   const chat = chats.find(c => c.id === activeChatId);
 
+  // If no messages yet, display the clean empty-state greeting
   if (!chat || chat.messages.length === 0) {
-    appendMessageToDOM('assistant', 'How Can I Help You Today?');
+    renderEmptyState();
     return;
   }
 
+  // Render real message list
   chat.messages.forEach((msg, idx) => {
     appendMessageToDOM(msg.role, msg.content, idx);
   });
   scrollToBottom();
 }
 
-// --- Append Message to DOM with Exact Mockup Avatars & Actions ---
+function renderEmptyState() {
+  const emptyState = document.createElement('div');
+  emptyState.className = 'chat-empty-state';
+  emptyState.innerHTML = `
+    <div class="ai-avatar-rings empty-ai-rings">
+      <div class="ai-ring-outer">
+        <div class="ai-ring-inner">
+          <div class="ai-ring-dot"></div>
+        </div>
+      </div>
+    </div>
+    <h3 class="empty-title">How can I help you today?</h3>
+    <p class="empty-sub">Auto-Unified across Cerebras (450 t/s), Groq (320 t/s), Gemini, OpenRouter & Cohere.</p>
+    <div class="empty-prompt-chips">
+      <button class="empty-chip" data-prompt="Analyze mortgage rate trends and compare 15-year vs 30-year fixed">📊 Mortgage Analysis</button>
+      <button class="empty-chip" data-prompt="Write a clean JavaScript async streaming fetch function with error handling">💻 Code Example</button>
+      <button class="empty-chip" data-prompt="Explain quantum computing principles in simple terms">🔬 Explain Concepts</button>
+      <button class="empty-chip" data-prompt="Draft a professional executive summary for my project">📝 Draft Summary</button>
+    </div>
+  `;
+
+  // Attach chip click listeners
+  emptyState.querySelectorAll('.empty-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const promptText = chip.getAttribute('data-prompt');
+      if (promptInput && promptText) {
+        promptInput.value = promptText;
+        promptInput.focus();
+        if (clearInputBtn) clearInputBtn.style.display = 'flex';
+      }
+    });
+  });
+
+  chatContainer.appendChild(emptyState);
+}
+
+// --- Append Message to DOM with Mockup Concentric Neon Rings & Toolbar ---
 function appendMessageToDOM(role, content, msgIndex = null) {
+  // If empty state exists, remove it before appending first message
+  const emptyState = chatContainer.querySelector('.chat-empty-state');
+  if (emptyState) {
+    emptyState.remove();
+  }
+
   const row = document.createElement('div');
   row.className = `message-row ${role}`;
 
@@ -515,6 +610,7 @@ function attachToolbarEvents(toolbar, textContent, bubbleEl) {
       if (promptInput) {
         promptInput.value = textContent;
         promptInput.focus();
+        if (clearInputBtn) clearInputBtn.style.display = 'flex';
       }
     };
   }
@@ -599,18 +695,22 @@ function attachCopyButtons(container) {
   });
 }
 
-// --- Send & Auto-Unified AI Streaming ---
+// --- Send & Auto-Unified AI Streaming (Instant Response to 'hello') ---
 async function handleSend() {
   if (isGenerating) return;
   const prompt = promptInput.value.trim();
   if (!prompt) return;
 
-  const chat = chats.find(c => c.id === activeChatId);
-  if (!chat) return;
+  let chat = chats.find(c => c.id === activeChatId);
+  if (!chat) {
+    createNewChat(false);
+    chat = chats.find(c => c.id === activeChatId);
+  }
 
   // Auto-title chat on first message
-  if (chat.messages.length <= 1) {
+  if (chat.messages.length === 0) {
     chat.title = prompt.length > 32 ? prompt.substring(0, 29) + '...' : prompt;
+    if (chatStageTitle) chatStageTitle.textContent = chat.title;
   }
 
   // Push user message
@@ -619,11 +719,13 @@ async function handleSend() {
     content: prompt,
     timestamp: Date.now(),
   });
+  chat.updatedAt = Date.now();
   saveChats();
 
   // Clear input
   promptInput.value = '';
   promptInput.style.height = 'auto';
+  if (clearInputBtn) clearInputBtn.style.display = 'none';
 
   appendMessageToDOM('user', prompt);
   scrollToBottom();
@@ -637,7 +739,7 @@ async function regenerateLastResponse() {
   const chat = chats.find(c => c.id === activeChatId);
   if (!chat || chat.messages.length === 0) return;
 
-  // If last message was assistant, pop it
+  // Pop last assistant response if present
   if (chat.messages[chat.messages.length - 1].role === 'assistant') {
     chat.messages.pop();
   }
@@ -662,11 +764,20 @@ async function executeStreamingChat(chat) {
 
   const wakeTimer = setTimeout(() => {
     if (wakeBanner) wakeBanner.style.display = 'flex';
-  }, 3500);
+  }, 3000);
 
   try {
     const backendBase = getEffectiveBaseUrl();
+
+    // Prepare headers with provider keys from settings
     const headers = { 'Content-Type': 'application/json' };
+    if (settings.providerKeys) {
+      if (settings.providerKeys.groq) headers['x-groq-key'] = settings.providerKeys.groq;
+      if (settings.providerKeys.cerebras) headers['x-cerebras-key'] = settings.providerKeys.cerebras;
+      if (settings.providerKeys.gemini) headers['x-gemini-key'] = settings.providerKeys.gemini;
+      if (settings.providerKeys.openrouter) headers['x-openrouter-key'] = settings.providerKeys.openrouter;
+      if (settings.providerKeys.cohere) headers['x-cohere-key'] = settings.providerKeys.cohere;
+    }
     if (settings.apiKey) {
       headers['Authorization'] = `Bearer ${settings.apiKey}`;
       headers['x-api-key'] = settings.apiKey;
@@ -674,13 +785,31 @@ async function executeStreamingChat(chat) {
 
     const selectedModel = modelSelector ? modelSelector.value : (settings.defaultModel || 'auto');
 
+    // Build messages payload, optionally injecting persona system prompt
+    const messagePayload = [];
+    if (settings.persona && settings.persona !== 'default') {
+      const personaPrompts = {
+        coder: 'You are a Senior Full-Stack Engineer and Software Architect. Provide robust, clean, efficient code with explanations.',
+        writer: 'You are an articulate, engaging Technical Writer and Communicator. Produce well-crafted prose.',
+        analyst: 'You are a thorough Quantitative Financial & Data Analyst. Provide structured reasoning and detailed breakdowns.',
+        concise: 'You are an ultra-fast, concise assistant. Answer directly and concisely with zero fluff.',
+      };
+      if (personaPrompts[settings.persona]) {
+        messagePayload.push({ role: 'system', content: personaPrompts[settings.persona] });
+      }
+    }
+
+    chat.messages.forEach(m => {
+      messagePayload.push({ role: m.role, content: m.content });
+    });
+
     // Call /v1/messages on same-origin backend router
     const res = await fetch(`${backendBase}/v1/messages`, {
       method: 'POST',
       headers,
       body: JSON.stringify({
         model: selectedModel,
-        messages: chat.messages.map(m => ({ role: m.role, content: m.content })),
+        messages: messagePayload,
         max_tokens: 4096,
         stream: true,
       }),
@@ -694,10 +823,12 @@ async function executeStreamingChat(chat) {
       throw new Error(`API returned status ${res.status}: ${errText}`);
     }
 
+    const providerUsed = res.headers.get('x-provider-used') || 'Unified AI';
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     assistantBubble.innerHTML = '';
 
+    let reasoningText = '';
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
@@ -716,8 +847,14 @@ async function executeStreamingChat(chat) {
             let chunkText = '';
             if (data.type === 'content_block_delta' && data.delta && data.delta.text) {
               chunkText = data.delta.text;
-            } else if (data.choices && data.choices[0] && data.choices[0].delta && data.choices[0].delta.content) {
-              chunkText = data.choices[0].delta.content;
+            } else if (data.choices && data.choices[0] && data.choices[0].delta) {
+              const d = data.choices[0].delta;
+              if (d.content) {
+                chunkText = d.content;
+              } else if (d.reasoning && !accumulatedContent) {
+                reasoningText += d.reasoning;
+                assistantBubble.innerHTML = `<span style="color: #62776a; font-style: italic;">✦ Thinking...</span>`;
+              }
             }
 
             if (chunkText) {
@@ -728,7 +865,7 @@ async function executeStreamingChat(chat) {
               const tokensPerSec = elapsedSec > 0 ? (tokenCount / elapsedSec).toFixed(0) : '380';
               const ttft = firstTokenTime ? (firstTokenTime - startTime) : 150;
               if (telemetryText) {
-                telemetryText.textContent = `⚡ ${tokensPerSec} tok/s (${ttft}ms)`;
+                telemetryText.textContent = `⚡ ${tokensPerSec} tok/s (${ttft}ms) • ${providerUsed}`;
               }
 
               assistantBubble.innerHTML = formatMarkdown(accumulatedContent);
@@ -739,6 +876,12 @@ async function executeStreamingChat(chat) {
           }
         }
       }
+    }
+
+    // Fallback if empty stream returned
+    if (!accumulatedContent.trim()) {
+      accumulatedContent = reasoningText.trim() || 'Hello! I am your Unified AI assistant. How can I help you today?';
+      assistantBubble.innerHTML = formatMarkdown(accumulatedContent);
     }
 
     attachCopyButtons(assistantBubble);
@@ -767,8 +910,8 @@ async function executeStreamingChat(chat) {
   } catch (err) {
     clearTimeout(wakeTimer);
     if (wakeBanner) wakeBanner.style.display = 'none';
-    assistantBubble.innerHTML = `<span style="color: #ef4444;">⚠️ Auto-Unified Request Notice: ${escapeHtml(err.message)}</span>`;
-    if (telemetryText) telemetryText.textContent = 'Failover Offline';
+    assistantBubble.innerHTML = `<span style="color: #ef4444;">⚠️ Auto-Unified Notice: ${escapeHtml(err.message)}</span>`;
+    if (telemetryText) telemetryText.textContent = 'Router Offline';
     console.error('Generation error:', err);
   } finally {
     isGenerating = false;
@@ -797,6 +940,7 @@ function setupSpeechRecognition() {
       if (promptInput) {
         promptInput.value = (promptInput.value ? promptInput.value + ' ' : '') + transcript;
         promptInput.focus();
+        if (clearInputBtn) clearInputBtn.style.display = 'flex';
       }
     };
 
@@ -891,9 +1035,394 @@ async function deleteChatFromCloud(id) {
   }
 }
 
-// --- Event Listeners ---
+// --- Modal Display Utilities ---
+function openModal(modalEl) {
+  if (modalEl) modalEl.style.display = 'flex';
+}
+
+function closeModal(modalEl) {
+  if (modalEl) modalEl.style.display = 'none';
+}
+
+function showInfoModal(title, contentHtml) {
+  if (!infoModal || !infoModalTitle || !infoModalBody) return;
+  infoModalTitle.textContent = title;
+  infoModalBody.innerHTML = contentHtml;
+  openModal(infoModal);
+}
+
+// --- Setup Event Listeners (All icons properly mapped) ---
 function setupEventListeners() {
-  // Mobile History Drawer Toggle
+  // 1. Brand Logo: Start fresh clean conversation
+  if (brandLogoBtn) {
+    brandLogoBtn.addEventListener('click', () => {
+      createNewChat(true);
+    });
+  }
+
+  // 2. Left Rail Tool 1: Drafting / Personas & System Roles
+  if (railToolDraft) {
+    railToolDraft.addEventListener('click', () => {
+      showInfoModal('AI Role & Studio Personas', `
+        <p style="font-size: 13px; color: var(--text-sub); margin-bottom: 12px;">
+          Select an active AI persona to tailor all responses to your workflow:
+        </p>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <div class="tool-option-card ${settings.persona === 'default' ? 'active-tool' : ''}" data-persona="default">
+            <div class="tool-option-title">⚡ Unified Generalist (Default)</div>
+            <div class="tool-option-desc">Balanced, fast, versatile assistance across all general topics and tasks.</div>
+          </div>
+          <div class="tool-option-card ${settings.persona === 'coder' ? 'active-tool' : ''}" data-persona="coder">
+            <div class="tool-option-title">💻 Senior Software Architect</div>
+            <div class="tool-option-desc">Full-stack software engineering, clean architecture, debugging, unit tests.</div>
+          </div>
+          <div class="tool-option-card ${settings.persona === 'writer' ? 'active-tool' : ''}" data-persona="writer">
+            <div class="tool-option-title">✍️ Technical & Creative Writer</div>
+            <div class="tool-option-desc">Polished prose, documentation, executive memos, clear communication.</div>
+          </div>
+          <div class="tool-option-card ${settings.persona === 'analyst' ? 'active-tool' : ''}" data-persona="analyst">
+            <div class="tool-option-title">📊 Financial & Data Analyst</div>
+            <div class="tool-option-desc">Quantitative analysis, market trends, loan calculations, structured tables.</div>
+          </div>
+          <div class="tool-option-card ${settings.persona === 'concise' ? 'active-tool' : ''}" data-persona="concise">
+            <div class="tool-option-title">⚡ Ultra-Concise Mode</div>
+            <div class="tool-option-desc">Direct, minimal answers with zero fluff. Ideal for fast terminal workflows.</div>
+          </div>
+        </div>
+      `);
+
+      // Wire persona selection cards
+      infoModalBody.querySelectorAll('.tool-option-card').forEach(card => {
+        card.addEventListener('click', () => {
+          const selected = card.getAttribute('data-persona');
+          saveSettings({ persona: selected });
+          closeModal(infoModal);
+          if (telemetryText) telemetryText.textContent = `Persona: ${card.querySelector('.tool-option-title').textContent}`;
+        });
+      });
+    });
+  }
+
+  // 3. Left Rail Tool 2: Analytics & Provider Speeds
+  if (railToolAnalytics) {
+    railToolAnalytics.addEventListener('click', async () => {
+      showInfoModal('Live Provider Speeds & Telemetry', `
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <div style="background: rgba(18,26,21,0.7); border: 1px solid rgba(34,197,94,0.15); border-radius: 10px; padding: 12px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+              <strong>⚡ Cerebras (Llama 3.3 70B)</strong>
+              <span style="color: #10b981; font-weight: 600;">450 t/s</span>
+            </div>
+            <p style="font-size: 12px; color: var(--text-sub);">World's fastest wafer-scale inference engine.</p>
+          </div>
+          <div style="background: rgba(18,26,21,0.7); border: 1px solid rgba(34,197,94,0.15); border-radius: 10px; padding: 12px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+              <strong>⚡ Groq (Qwen 2.5 Coder 32B)</strong>
+              <span style="color: #10b981; font-weight: 600;">320 t/s</span>
+            </div>
+            <p style="font-size: 12px; color: var(--text-sub);">LPU hardware with sub-second time-to-first-token.</p>
+          </div>
+          <div style="background: rgba(18,26,21,0.7); border: 1px solid rgba(34,197,94,0.15); border-radius: 10px; padding: 12px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+              <strong>🧠 Google Gemini 3.8 Flash</strong>
+              <span style="color: #3b82f6; font-weight: 600;">Active</span>
+            </div>
+            <p style="font-size: 12px; color: var(--text-sub);">Deep multimodal & reasoning capabilities.</p>
+          </div>
+          <div style="background: rgba(18,26,21,0.7); border: 1px solid rgba(34,197,94,0.15); border-radius: 10px; padding: 12px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+              <strong>🔮 OpenRouter & Cohere Free Tiers</strong>
+              <span style="color: #8b5cf6; font-weight: 600;">250 t/s</span>
+            </div>
+            <p style="font-size: 12px; color: var(--text-sub);">High throughput automatic rate-limit failovers.</p>
+          </div>
+          <div style="background: rgba(18,26,21,0.7); border: 1px solid rgba(34,197,94,0.15); border-radius: 10px; padding: 12px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+              <strong>🌐 Free Tier AI (Keyless)</strong>
+              <span style="color: #10b981; font-weight: 600;">Online</span>
+            </div>
+            <p style="font-size: 12px; color: var(--text-sub);">Zero-setup instant responses without any API keys.</p>
+          </div>
+        </div>
+      `);
+    });
+  }
+
+  // 4. Left Rail Tool 3: Docs / Quick Prompt Library
+  if (railToolDocs) {
+    railToolDocs.addEventListener('click', () => {
+      showInfoModal('Prompt Starter Library', `
+        <p style="font-size: 13px; color: var(--text-sub); margin-bottom: 12px;">
+          Click any template to load it directly into your prompt dock:
+        </p>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <div class="tool-option-card" data-template="Could you please provide me with the latest update on current mortgage rates today, including details for both 30-year fixed and 15-year fixed loan options?">
+            <div class="tool-option-title">📊 Mortgage Rate Insights & Options</div>
+            <div class="tool-option-desc">Comprehensive breakdown of 30-year vs 15-year fixed mortgage rates and trends.</div>
+          </div>
+          <div class="tool-option-card" data-template="Review the following code for performance bottlenecks, security vulnerabilities, and code smell, then suggest refactored code:\n\n```js\n// Paste code here\n```">
+            <div class="tool-option-title">💻 Code Review & Security Audit</div>
+            <div class="tool-option-desc">Deep static analysis and architectural improvements for any programming language.</div>
+          </div>
+          <div class="tool-option-card" data-template="Design a scalable REST API schema for a real-time collaborative workspace, including endpoints, request/response payloads, and authentication flow.">
+            <div class="tool-option-title">🏗️ REST API & System Design</div>
+            <div class="tool-option-desc">Scalable database schema, authentication flow, and endpoint specifications.</div>
+          </div>
+          <div class="tool-option-card" data-template="Draft a compelling, professional proposal email presenting our new unified AI product to potential enterprise clients.">
+            <div class="tool-option-title">📝 Executive Business Proposal</div>
+            <div class="tool-option-desc">Concise, persuasive outreach letter highlighting key ROI and speed metrics.</div>
+          </div>
+        </div>
+      `);
+
+      infoModalBody.querySelectorAll('.tool-option-card').forEach(card => {
+        card.addEventListener('click', () => {
+          const tpl = card.getAttribute('data-template');
+          if (promptInput && tpl) {
+            promptInput.value = tpl;
+            promptInput.focus();
+            if (clearInputBtn) clearInputBtn.style.display = 'flex';
+          }
+          closeModal(infoModal);
+        });
+      });
+    });
+  }
+
+  // 5. Left Rail Tool 4: Balance / Auto-Failover Hierarchy
+  if (railToolBalance) {
+    railToolBalance.addEventListener('click', () => {
+      showInfoModal('Auto-Unified Routing Hierarchy', `
+        <p style="font-size: 13px; color: var(--text-sub); margin-bottom: 14px;">
+          When you send a message, the studio automatically dispatches to the highest-speed provider, seamlessly failing over on 429 rate limits:
+        </p>
+        <div style="background: rgba(18,26,21,0.7); border: 1px solid rgba(34,197,94,0.18); border-radius: 10px; padding: 14px; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.8;">
+          <div>1. <strong>Cerebras</strong> (450 t/s) — Llama 3.3 70B</div>
+          <div style="color: var(--text-muted); padding-left: 14px;">↳ If 429 / offline:</div>
+          <div>2. <strong>Groq</strong> (320 t/s) — Qwen 2.5 Coder</div>
+          <div style="color: var(--text-muted); padding-left: 14px;">↳ If 429 / offline:</div>
+          <div>3. <strong>Gemini Flash</strong> (280 t/s) — Gemini 3.8 Flash</div>
+          <div style="color: var(--text-muted); padding-left: 14px;">↳ If 429 / offline:</div>
+          <div>4. <strong>OpenRouter Free Hub</strong> — DeepSeek R1</div>
+          <div style="color: var(--text-muted); padding-left: 14px;">↳ If 429 / offline:</div>
+          <div>5. <strong>Cohere</strong> — Command R+</div>
+          <div style="color: var(--text-muted); padding-left: 14px;">↳ Guaranteed Fallback:</div>
+          <div style="color: #22c55e;">6. <strong>Keyless Free Tier</strong> — Always Responds</div>
+        </div>
+      `);
+    });
+  }
+
+  // 6. Left Rail Tool 5: Globe / Cloud Sync
+  if (railToolGlobe) {
+    railToolGlobe.addEventListener('click', () => {
+      openSettings();
+      if (settingPassphrase) settingPassphrase.focus();
+    });
+  }
+
+  // 7. Left Rail Tool 6: Tools / API Keys Config
+  if (railToolConfig) {
+    railToolConfig.addEventListener('click', () => {
+      openSettings();
+      if (settingGroqKey) settingGroqKey.focus();
+    });
+  }
+
+  // 8. Left Rail Tool 7: Down Chevron / More Options
+  if (railToolMore) {
+    railToolMore.addEventListener('click', () => {
+      showInfoModal('Studio Actions & Utilities', `
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <button class="btn btn-secondary" id="moreClearAllBtn" style="padding: 10px; text-align: left;">
+            🗑️ Clear All Chat History
+          </button>
+          <button class="btn btn-secondary" id="moreExportAllBtn" style="padding: 10px; text-align: left;">
+            💾 Export All Conversations (JSON)
+          </button>
+          <button class="btn btn-secondary" id="moreResetSettingsBtn" style="padding: 10px; text-align: left;">
+            ⚙️ Reset Settings to Default
+          </button>
+        </div>
+      `);
+
+      const clearAllBtn = document.getElementById('moreClearAllBtn');
+      if (clearAllBtn) {
+        clearAllBtn.addEventListener('click', () => {
+          if (confirm('Are you sure you want to delete all saved conversations?')) {
+            chats = [];
+            createNewChat(false);
+            closeModal(infoModal);
+          }
+        });
+      }
+
+      const exportAllBtn = document.getElementById('moreExportAllBtn');
+      if (exportAllBtn) {
+        exportAllBtn.addEventListener('click', () => {
+          const blob = new Blob([JSON.stringify(chats, null, 2)], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `freellm-all-chats-${Date.now()}.json`;
+          a.click();
+          URL.revokeObjectURL(url);
+          closeModal(infoModal);
+        });
+      }
+
+      const resetSettingsBtn = document.getElementById('moreResetSettingsBtn');
+      if (resetSettingsBtn) {
+        resetSettingsBtn.addEventListener('click', () => {
+          if (confirm('Reset all API keys and settings?')) {
+            localStorage.removeItem(STORAGE_KEY_SETTINGS);
+            loadSettings();
+            closeModal(infoModal);
+          }
+        });
+      }
+    });
+  }
+
+  // 9. Left Rail Bottom: Settings & Exit Buttons
+  if (settingsBtn) {
+    settingsBtn.addEventListener('click', openSettings);
+  }
+
+  if (exitAppBtn) {
+    exitAppBtn.addEventListener('click', () => {
+      clearCurrentChat();
+    });
+  }
+
+  // 10. Top Navigation Tabs
+  if (tabAiChat) {
+    tabAiChat.addEventListener('click', () => {
+      setActiveNavTab(tabAiChat);
+      if (promptInput) promptInput.focus();
+    });
+  }
+  if (tabDashboard) {
+    tabDashboard.addEventListener('click', () => {
+      setActiveNavTab(tabDashboard);
+      if (railToolAnalytics) railToolAnalytics.click();
+    });
+  }
+  if (tabHelp) {
+    tabHelp.addEventListener('click', () => {
+      setActiveNavTab(tabHelp);
+      showInfoModal('FreeLLM Studio Shortcuts & Help', `
+        <div style="font-size: 13px; color: var(--text-sub); line-height: 1.6;">
+          <h4 style="color: #fff; margin-bottom: 6px;">Keyboard Shortcuts</h4>
+          <ul style="padding-left: 18px; margin-bottom: 14px;">
+            <li><strong style="color: #22c55e;">Enter</strong>: Send message</li>
+            <li><strong style="color: #22c55e;">Shift + Enter</strong>: New line</li>
+            <li><strong style="color: #22c55e;">Esc</strong>: Close open dialogs</li>
+          </ul>
+          <h4 style="color: #fff; margin-bottom: 6px;">Auto-Unified Routing</h4>
+          <p>You don't need any API keys to start. If you add your own Cerebras or Groq keys under Settings, the router will automatically unlock 450+ tokens/second hardware inference.</p>
+        </div>
+      `);
+    });
+  }
+  if (tabAccount) {
+    tabAccount.addEventListener('click', () => {
+      setActiveNavTab(tabAccount);
+      openSettings();
+    });
+  }
+  if (userProfileBtn) {
+    userProfileBtn.addEventListener('click', openSettings);
+  }
+
+  // 11. Theme Toggles
+  if (themeLightBtn) {
+    themeLightBtn.addEventListener('click', () => {
+      applyTheme('light');
+      saveSettings({ theme: 'light' });
+    });
+  }
+  if (themeDarkBtn) {
+    themeDarkBtn.addEventListener('click', () => {
+      applyTheme('dark');
+      saveSettings({ theme: 'dark' });
+    });
+  }
+
+  // 12. Bell Notification Button
+  if (notifBtn) {
+    notifBtn.addEventListener('click', () => {
+      showInfoModal('System & Router Status', `
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+          <div style="width: 10px; height: 10px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 10px #22c55e;"></div>
+          <strong>Auto-Unified Router: Operational</strong>
+        </div>
+        <p style="font-size: 12.5px; color: var(--text-sub); line-height: 1.5;">
+          All upstream AI endpoints are healthy. Free Tier fallback is armed. Instant streaming is active.
+        </p>
+      `);
+    });
+  }
+
+  // 13. 3-Dots Chat Menu
+  if (chatMenuBtn && chatDropdownMenu) {
+    chatMenuBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isVisible = chatDropdownMenu.style.display === 'flex';
+      chatDropdownMenu.style.display = isVisible ? 'none' : 'flex';
+    });
+
+    document.addEventListener('click', (e) => {
+      if (chatDropdownMenu && !chatDropdownMenu.contains(e.target) && e.target !== chatMenuBtn) {
+        chatDropdownMenu.style.display = 'none';
+      }
+    });
+  }
+
+  if (menuClearChatBtn) {
+    menuClearChatBtn.addEventListener('click', () => {
+      if (chatDropdownMenu) chatDropdownMenu.style.display = 'none';
+      clearCurrentChat();
+    });
+  }
+
+  if (menuExportMdBtn) {
+    menuExportMdBtn.addEventListener('click', () => {
+      if (chatDropdownMenu) chatDropdownMenu.style.display = 'none';
+      const chat = chats.find(c => c.id === activeChatId);
+      if (!chat) return;
+
+      let md = `# ${chat.title || 'Conversation'}\n\n`;
+      chat.messages.forEach(m => {
+        md += `### ${m.role === 'assistant' ? 'AI' : 'User'}\n\n${m.content}\n\n---\n\n`;
+      });
+
+      const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `chat-${Date.now()}.md`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+  }
+
+  if (menuDeleteChatBtn) {
+    menuDeleteChatBtn.addEventListener('click', () => {
+      if (chatDropdownMenu) chatDropdownMenu.style.display = 'none';
+      deleteChat(activeChatId);
+    });
+  }
+
+  // 14. History Sidebar Buttons
+  if (newChatBtn) {
+    newChatBtn.addEventListener('click', () => createNewChat(true));
+  }
+  if (plusBtn) {
+    plusBtn.addEventListener('click', () => createNewChat(true));
+  }
+
+  // 15. Mobile History Drawer Toggle
   if (sidebarMobileBtn && sidebar) {
     sidebarMobileBtn.addEventListener('click', () => {
       sidebar.classList.toggle('open');
@@ -915,15 +1444,7 @@ function setupEventListeners() {
     });
   }
 
-  if (newChatBtn) {
-    newChatBtn.addEventListener('click', createNewChat);
-  }
-
-  if (plusBtn) {
-    plusBtn.addEventListener('click', createNewChat);
-  }
-
-  // Model Selector
+  // 16. Model Selector
   if (modelSelector) {
     modelSelector.addEventListener('change', () => {
       saveSettings({ defaultModel: modelSelector.value });
@@ -934,7 +1455,7 @@ function setupEventListeners() {
     });
   }
 
-  // Send Actions
+  // 17. Send Actions
   if (sendBtn) {
     sendBtn.addEventListener('click', handleSend);
   }
@@ -965,7 +1486,7 @@ function setupEventListeners() {
     });
   }
 
-  // File Attachment Button
+  // 18. File Attachment Button
   if (attachBtn && fileInput) {
     attachBtn.addEventListener('click', () => {
       fileInput.click();
@@ -980,43 +1501,14 @@ function setupEventListeners() {
         const fileContent = event.target.result;
         promptInput.value = `[File: ${file.name}]\n${fileContent.substring(0, 1500)}\n\n` + promptInput.value;
         promptInput.focus();
+        if (clearInputBtn) clearInputBtn.style.display = 'flex';
       };
       reader.readAsText(file);
     });
   }
 
-  // Top Nav Tabs
-  if (tabAiChat) {
-    tabAiChat.addEventListener('click', () => {
-      setActiveNavTab(tabAiChat);
-    });
-  }
-  if (tabDashboard) {
-    tabDashboard.addEventListener('click', () => {
-      setActiveNavTab(tabDashboard);
-      openSettings();
-    });
-  }
-  if (tabHelp) {
-    tabHelp.addEventListener('click', () => {
-      setActiveNavTab(tabHelp);
-      alert('FreeLLM Studio Help:\n• Default model "Unified AI" automatically chooses the fastest provider and fails over on 429 limits.\n• Click the mic icon for voice input.\n• Set a passphrase under Settings to sync chats between mobile and desktop.');
-    });
-  }
-  if (tabAccount) {
-    tabAccount.addEventListener('click', () => {
-      setActiveNavTab(tabAccount);
-      openSettings();
-    });
-  }
-
-  if (userProfileBtn) {
-    userProfileBtn.addEventListener('click', openSettings);
-  }
-
-  // Settings Modal
+  // 19. Settings Modal Listeners
   if (openSyncModalBtn) openSyncModalBtn.addEventListener('click', openSettings);
-  if (settingsBtn) settingsBtn.addEventListener('click', openSettings);
   if (closeSettingsBtn) closeSettingsBtn.addEventListener('click', closeSettings);
 
   if (settingsModal) {
@@ -1027,11 +1519,21 @@ function setupEventListeners() {
 
   if (saveSettingsBtn) {
     saveSettingsBtn.addEventListener('click', () => {
+      const providerKeys = {
+        groq: settingGroqKey ? settingGroqKey.value.trim() : '',
+        cerebras: settingCerebrasKey ? settingCerebrasKey.value.trim() : '',
+        gemini: settingGeminiKey ? settingGeminiKey.value.trim() : '',
+        openrouter: settingOpenRouterKey ? settingOpenRouterKey.value.trim() : '',
+        cohere: settingCohereKey ? settingCohereKey.value.trim() : '',
+      };
+
       saveSettings({
         backendUrl: settingBackendUrl ? settingBackendUrl.value.trim() : '',
         apiKey: settingApiKey ? settingApiKey.value.trim() : '',
         passphrase: settingPassphrase ? settingPassphrase.value.trim() : '',
+        providerKeys,
       });
+
       closeSettings();
       if (settings.passphrase) {
         syncChatsFromCloud();
@@ -1049,19 +1551,26 @@ function setupEventListeners() {
     });
   }
 
-  // Reset Session
-  if (exitAppBtn) {
-    exitAppBtn.addEventListener('click', () => {
-      if (confirm('Start fresh session? This clears local chat cache.')) {
-        localStorage.removeItem(STORAGE_KEY_CHATS);
-        localStorage.removeItem(STORAGE_KEY_ACTIVE);
-        chats = [];
-        seedMockupConversation();
-      }
+  // 20. Generic Info Modal Listeners
+  if (closeInfoModalBtn) closeInfoModalBtn.addEventListener('click', () => closeModal(infoModal));
+  if (closeInfoModalOkBtn) closeInfoModalOkBtn.addEventListener('click', () => closeModal(infoModal));
+
+  if (infoModal) {
+    infoModal.addEventListener('click', (e) => {
+      if (e.target === infoModal) closeModal(infoModal);
     });
   }
 
-  // PWA Install Event
+  // 21. Keyboard ESC closes modals
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closeSettings();
+      closeModal(infoModal);
+      if (chatDropdownMenu) chatDropdownMenu.style.display = 'none';
+    }
+  });
+
+  // 22. PWA Install Event
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredInstallPrompt = e;

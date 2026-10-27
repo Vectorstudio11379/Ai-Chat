@@ -67,16 +67,16 @@ export function createRouter({ env = process.env, fetchFn = globalThis.fetch } =
     return status;
   }
 
-  function getAvailableProviders() {
+  function getAvailableProviders(activeEnv = env) {
     return Object.entries(PROVIDER_CONFIGS)
-      .filter(([_, cfg]) => Boolean(env[cfg.envKey] && env[cfg.envKey].trim().length > 0))
+      .filter(([_, cfg]) => Boolean(activeEnv[cfg.envKey] && activeEnv[cfg.envKey].trim().length > 0))
       .map(([key, cfg]) => ({ id: key, ...cfg }));
   }
 
   async function handleRequest(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-api-key');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-api-key, x-groq-key, x-cerebras-key, x-gemini-key, x-openrouter-key, x-cohere-key');
 
     if (req.method === 'OPTIONS') {
       res.writeHead(204);
@@ -91,20 +91,45 @@ export function createRouter({ env = process.env, fetchFn = globalThis.fetch } =
       return;
     }
 
-    const available = getAvailableProviders();
+    // Dynamic key resolution from environment AND client request headers/body
+    const activeEnv = { ...env };
+    const headers = req.headers || {};
+    if (headers['x-groq-key']) activeEnv.GROQ_API_KEY = headers['x-groq-key'];
+    if (headers['x-cerebras-key']) activeEnv.CEREBRAS_API_KEY = headers['x-cerebras-key'];
+    if (headers['x-gemini-key']) activeEnv.GEMINI_API_KEY = headers['x-gemini-key'];
+    if (headers['x-openrouter-key']) activeEnv.OPENROUTER_API_KEY = headers['x-openrouter-key'];
+    if (headers['x-cohere-key']) activeEnv.COHERE_API_KEY = headers['x-cohere-key'];
+
+    const genericKey = (headers['x-api-key'] || (headers['authorization'] || '').replace(/^Bearer\s+/i, '') || (body.apiKey || '')).trim();
+    if (genericKey) {
+      if (genericKey.startsWith('gsk_')) activeEnv.GROQ_API_KEY = genericKey;
+      else if (genericKey.startsWith('csk_')) activeEnv.CEREBRAS_API_KEY = genericKey;
+      else if (genericKey.startsWith('AIzaSy')) activeEnv.GEMINI_API_KEY = genericKey;
+      else if (genericKey.startsWith('sk-or-')) activeEnv.OPENROUTER_API_KEY = genericKey;
+      else if (!activeEnv.OPENROUTER_API_KEY) activeEnv.OPENROUTER_API_KEY = genericKey;
+    }
+
+    let available = getAvailableProviders(activeEnv);
+
+    // If zero API keys are configured, add free keyless AI provider so AI ALWAYS responds!
     if (available.length === 0) {
-      res.writeHead(503, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        error: 'No active AI providers found. Please configure GROQ_API_KEY, CEREBRAS_API_KEY, OPENROUTER_API_KEY, COHERE_API_KEY, or GEMINI_API_KEY in environment variables.'
-      }));
-      return;
+      available.push({
+        id: 'pollinations',
+        name: 'Free Tier AI (Keyless)',
+        envKey: null,
+        url: 'https://text.pollinations.ai/openai',
+        models: ['openai', 'gpt-4o-mini', 'qwen-coder'],
+        defaultModel: 'openai',
+        speed: '180 t/s',
+      });
     }
 
     let requestedModel = (body.model || '').toLowerCase();
     if (MODEL_ALIASES[requestedModel]) {
       requestedModel = MODEL_ALIASES[requestedModel];
     }
-    // Sort providers so if a requested model matches a specific provider, that provider goes first
+
+    // Prioritize providers based on requested model
     const prioritized = [...available].sort((a, b) => {
       const aHas = a.models.some(m => m.toLowerCase().includes(requestedModel));
       const bHas = b.models.some(m => m.toLowerCase().includes(requestedModel));
@@ -116,17 +141,19 @@ export function createRouter({ env = process.env, fetchFn = globalThis.fetch } =
     let lastError = null;
 
     for (const provider of prioritized) {
-      const apiKey = env[provider.envKey];
+      const apiKey = provider.envKey ? activeEnv[provider.envKey] : null;
       const modelToUse = provider.models.includes(requestedModel) ? requestedModel : provider.defaultModel;
 
-      const headers = {
+      const reqHeaders = {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey.trim()}`,
       };
+      if (apiKey) {
+        reqHeaders['Authorization'] = `Bearer ${apiKey.trim()}`;
+      }
 
       if (provider.id === 'openrouter') {
-        headers['HTTP-Referer'] = 'https://freellmapi-studio.onrender.com';
-        headers['X-Title'] = 'FreeLLM Studio';
+        reqHeaders['HTTP-Referer'] = 'https://freellmapi-studio.onrender.com';
+        reqHeaders['X-Title'] = 'FreeLLM Studio';
       }
 
       const payload = {
@@ -142,7 +169,7 @@ export function createRouter({ env = process.env, fetchFn = globalThis.fetch } =
       try {
         const upstreamRes = await fetchFn(provider.url, {
           method: 'POST',
-          headers,
+          headers: reqHeaders,
           body: JSON.stringify(payload),
         });
 

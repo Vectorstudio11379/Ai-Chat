@@ -9,7 +9,7 @@
   <meta name="theme-color" content="#070a08">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
-  <link rel="stylesheet" href="/style.css?v=2.0">
+  <link rel="stylesheet" href="/style.css?v=4.0">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -44,7 +44,7 @@
     <!-- 1. Left Vertical Icon Rail -->
     <nav class="studio-left-rail" aria-label="Primary Navigation">
       <!-- Top Brand Neon Logo Square -->
-      <div class="rail-logo-wrapper" id="brandLogoBtn" title="FreeLLM Studio — Unified AI">
+      <div class="rail-logo-wrapper" id="brandLogoBtn" title="Start New Conversation">
         <div class="rail-logo">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
             <path d="M7 17L17 7M17 7H9M17 7V15" stroke="#062211" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
@@ -55,7 +55,7 @@
       <!-- Center Vertical Floating Capsule Dock (7 Icons from Mockup) -->
       <div class="rail-capsule-dock">
         <!-- 1. Drafting / Crane / Compass -->
-        <button class="rail-icon-btn" id="railToolDraft" title="Drafting & Code Studio" aria-label="Drafting Studio">
+        <button class="rail-icon-btn" id="railToolDraft" title="Studio Mode & Role Personas" aria-label="Drafting Studio">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 2v4M4.93 10.93l2.83-2.83M2 18h4M12 18v4M18 18h4M16.24 7.76l2.83-2.83"/>
             <circle cx="12" cy="14" r="4"/>
@@ -63,7 +63,7 @@
         </button>
 
         <!-- 2. Bar Chart / Analytics -->
-        <button class="rail-icon-btn" id="railToolAnalytics" title="Live Model Telemetry & Quotas" aria-label="Analytics & Quotas">
+        <button class="rail-icon-btn" id="railToolAnalytics" title="Live Provider Speeds & Telemetry" aria-label="Analytics & Quotas">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <rect x="3" y="12" width="4" height="9" rx="1"/>
             <rect x="10" y="7" width="4" height="14" rx="1"/>
@@ -72,21 +72,21 @@
         </button>
 
         <!-- 3. Bookmark Ribbon / Documents -->
-        <button class="rail-icon-btn" id="railToolDocs" title="Saved Prompts & Docs" aria-label="Saved Prompts">
+        <button class="rail-icon-btn" id="railToolDocs" title="Quick Prompt Templates & Starters" aria-label="Saved Prompts">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
           </svg>
         </button>
 
         <!-- 4. Balance / Scales of Justice -->
-        <button class="rail-icon-btn" id="railToolBalance" title="Provider Balance & Auto-Failover Chain" aria-label="Provider Balance">
+        <button class="rail-icon-btn" id="railToolBalance" title="Provider Balance & Auto-Failover Order" aria-label="Provider Balance">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 3v18M5 7l7-3 7 3M5 7v4a3 3 0 0 0 6 0V7M13 7v4a3 3 0 0 0 6 0V7"/>
           </svg>
         </button>
 
         <!-- 5. Globe with Grid -->
-        <button class="rail-icon-btn" id="railToolGlobe" title="Cloud Sync & Multi-Device Endpoints" aria-label="Cloud Sync">
+        <button class="rail-icon-btn" id="railToolGlobe" title="Cross-Device Cloud Sync Settings" aria-label="Cloud Sync">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="10"/>
             <line x1="2" y1="12" x2="22" y2="12"/>
@@ -95,14 +95,14 @@
         </button>
 
         <!-- 6. Tools (Wrench & Screwdriver) -->
-        <button class="rail-icon-btn" id="railToolConfig" title="Provider Setup & Keys" aria-label="Provider Config">
+        <button class="rail-icon-btn" id="railToolConfig" title="Provider API Keys (Groq, Cerebras, Gemini...)" aria-label="Provider Config">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
           </svg>
         </button>
 
         <!-- 7. Down Chevron (More) -->
-        <button class="rail-icon-btn rail-chevron-btn" id="railToolMore" title="More Tools" aria-label="More Options">
+        <button class="rail-icon-btn rail-chevron-btn" id="railToolMore" title="More Options & Actions" aria-label="More Options">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="6 9 12 15 18 9"/>
           </svg>
@@ -112,15 +112,15 @@
       <!-- Bottom Dock: Settings & Exit (from Mockup) -->
       <div class="rail-bottom-dock">
         <!-- Settings Gear -->
-        <button class="rail-circle-btn" id="settingsBtn" title="Studio Settings & Passphrase" aria-label="Settings">
+        <button class="rail-circle-btn" id="settingsBtn" title="Studio Settings" aria-label="Settings">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="3"/>
             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
           </svg>
         </button>
 
-        <!-- Exit / Back Arrow -->
-        <button class="rail-circle-btn" id="exitAppBtn" title="Reset Session / Clear Cache" aria-label="Exit or Reset">
+        <!-- Exit / Reset Session -->
+        <button class="rail-circle-btn" id="exitAppBtn" title="Clear Current Chat" aria-label="Clear Chat">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <line x1="19" y1="12" x2="5" y2="12"/>
             <polyline points="12 19 5 12 12 5"/>
@@ -200,7 +200,7 @@
           </button>
 
           <!-- Chat History Toggle -->
-          <button class="util-btn" id="sidebarToggle" title="Toggle History Chat" aria-label="Toggle history panel">
+          <button class="util-btn" id="sidebarToggle" title="Toggle History Chat Sidebar" aria-label="Toggle history panel">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
               <circle cx="9" cy="10" r="1" fill="currentColor"/>
@@ -210,7 +210,7 @@
           </button>
 
           <!-- Notifications Bell -->
-          <button class="util-btn" id="notifBtn" title="Notifications" aria-label="Notifications">
+          <button class="util-btn" id="notifBtn" title="Router & System Status" aria-label="Notifications">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
               <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
@@ -218,7 +218,7 @@
           </button>
 
           <!-- User Profile Avatar Pill -->
-          <div class="user-avatar-pill" id="userProfileBtn" title="Account & Sync Status">
+          <div class="user-avatar-pill" id="userProfileBtn" title="Account & Settings">
             <div class="user-avatar-img" role="img" aria-label="User avatar"></div>
           </div>
         </div>
@@ -230,14 +230,31 @@
         <main class="chat-workbench" aria-label="Chat Area">
           <!-- Chat Panel Header (AI Chat + 3-dots Menu from Mockup) -->
           <div class="chat-stage-header">
-            <h2 class="chat-stage-title">AI Chat</h2>
-            <button class="icon-circle-btn" id="chatMenuBtn" title="Conversation Options" aria-label="More conversation options">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                <circle cx="12" cy="5" r="1"/>
-                <circle cx="12" cy="12" r="1"/>
-                <circle cx="12" cy="19" r="1"/>
-              </svg>
-            </button>
+            <h2 class="chat-stage-title" id="chatStageTitle">AI Chat</h2>
+            <div class="header-menu-container">
+              <button class="icon-circle-btn" id="chatMenuBtn" title="Conversation Options" aria-label="More conversation options">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <circle cx="12" cy="5" r="1"/>
+                  <circle cx="12" cy="12" r="1"/>
+                  <circle cx="12" cy="19" r="1"/>
+                </svg>
+              </button>
+              <!-- 3-Dots Dropdown Menu -->
+              <div class="dropdown-menu" id="chatDropdownMenu" style="display: none;">
+                <button class="dropdown-item" id="menuClearChatBtn">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                  <span>Clear Current Chat</span>
+                </button>
+                <button class="dropdown-item" id="menuExportMdBtn">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                  <span>Export as Markdown</span>
+                </button>
+                <button class="dropdown-item" id="menuDeleteChatBtn" style="color: #ef4444;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  <span>Delete Session</span>
+                </button>
+              </div>
+            </div>
           </div>
 
           <!-- Connection / Wake Notice Banner -->
@@ -246,9 +263,9 @@
             <span>Connecting to FreeLLM router... (Container warming up)</span>
           </div>
 
-          <!-- Chat Messages Container -->
+          <!-- Chat Messages Container (Completely Clear on Startup) -->
           <div class="chat-container" id="chatContainer">
-            <!-- Messages rendered dynamically with exact mockup avatars & action toolbars -->
+            <!-- Dynamically populated with REAL messages only -->
           </div>
 
           <!-- Bottom Floating Prompt Dock (Exact Mockup Match) -->
@@ -258,10 +275,10 @@
               <div class="prompt-bottom-bar">
                 <!-- Left Action Buttons (+ and attachment) -->
                 <div class="prompt-left-actions">
-                  <button class="dock-circle-btn" id="plusBtn" title="New Session or Prompt Template" aria-label="Add prompt or tool">
+                  <button class="dock-circle-btn" id="plusBtn" title="New Session" aria-label="Start new session">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                   </button>
-                  <button class="dock-circle-btn" id="attachBtn" title="Attach Document or Image" aria-label="Attach file">
+                  <button class="dock-circle-btn" id="attachBtn" title="Attach Document or Code File" aria-label="Attach file">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
                   </button>
                   <input type="file" id="fileInput" style="display: none;" accept=".txt,.md,.py,.js,.json,.csv,.pdf,image/*">
@@ -286,7 +303,7 @@
           </div>
         </main>
 
-        <!-- 4. Right Sidebar: History Chat (Exact Mockup Match) -->
+        <!-- 4. Right Sidebar: Real History Chat -->
         <aside class="studio-sidebar" id="sidebar" aria-label="Chat History">
           <!-- History Header (History Chat + New Chat button) -->
           <div class="history-sidebar-header">
@@ -297,7 +314,7 @@
             </button>
           </div>
 
-          <!-- Scrollable Grouped Chat Threads (Today, 5 Days Ago, 7 Days Ago) -->
+          <!-- Scrollable Grouped REAL Chat Threads -->
           <div class="chat-list" id="chatList"></div>
 
           <!-- Hidden Sync Card (Preserves test assertions for passphrase sync) -->
@@ -343,11 +360,11 @@
       </div>
     </div>
 
-    <!-- Settings & Sync Modal -->
+    <!-- Settings Modal (Full Configuration) -->
     <div class="modal-backdrop" id="settingsModal" style="display: none;">
       <div class="modal-card">
         <div class="modal-header">
-          <h3>Developer Studio Settings</h3>
+          <h3 id="settingsModalTitle">Studio Settings & API Keys</h3>
           <button class="icon-btn" id="closeSettingsBtn">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
           </button>
@@ -356,22 +373,33 @@
           <div class="form-group">
             <label for="settingPassphrase">Unified Cross-Device Sync Passphrase</label>
             <div class="input-row">
-              <input type="password" id="settingPassphrase" placeholder="Enter your secret passphrase">
+              <input type="password" id="settingPassphrase" placeholder="Enter secret passphrase (e.g. my-super-vault)">
               <button class="btn btn-secondary" id="syncNowBtn">Sync Now</button>
             </div>
             <small>Entering this exact passphrase on your phone and PC connects your chat threads.</small>
           </div>
 
           <div class="form-group">
-            <label for="settingBackendUrl">Custom Backend URL (Optional)</label>
-            <input type="url" id="settingBackendUrl" placeholder="Defaults to current origin (No CORS / No 405)">
-            <small>Leave empty to use this same-origin server. Only change if using an external host.</small>
+            <label>Provider API Keys (Optional — Auto-Unified AI works keylessly by default!)</label>
+            <div class="key-inputs-grid">
+              <input type="password" id="settingGroqKey" placeholder="Groq API Key (gsk_...)">
+              <input type="password" id="settingCerebrasKey" placeholder="Cerebras Key (csk_...)">
+              <input type="password" id="settingGeminiKey" placeholder="Gemini Key (AIzaSy...)">
+              <input type="password" id="settingOpenRouterKey" placeholder="OpenRouter Key (sk-or-...)">
+              <input type="password" id="settingCohereKey" placeholder="Cohere Key (...)">
+            </div>
+            <small>Provide your own keys to unlock maximum speed hardware tiers (Cerebras 450 t/s, Groq 320 t/s).</small>
           </div>
 
           <div class="form-group">
-            <label for="settingApiKey">Unified API Key (Optional)</label>
+            <label for="settingBackendUrl">Custom Backend URL (Optional)</label>
+            <input type="url" id="settingBackendUrl" placeholder="Defaults to current origin (No CORS / No 405)">
+            <small>Leave empty to use this same-origin server.</small>
+          </div>
+
+          <div class="form-group" style="display: none;">
+            <label for="settingApiKey">Unified API Key</label>
             <input type="password" id="settingApiKey" placeholder="freellmapi-...">
-            <small>Optional authentication key if required by your upstream configuration.</small>
           </div>
         </div>
         <div class="modal-footer">
@@ -379,8 +407,24 @@
         </div>
       </div>
     </div>
+
+    <!-- Generic Info / Action Modal (For Rail Icons: Analytics, Personas, Balance, etc.) -->
+    <div class="modal-backdrop" id="infoModal" style="display: none;">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 id="infoModalTitle">Studio Tool</h3>
+          <button class="icon-btn" id="closeInfoModalBtn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="modal-body" id="infoModalBody"></div>
+        <div class="modal-footer">
+          <button class="btn btn-primary" id="closeInfoModalOkBtn">Done</button>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <script src="/app.js?v=2.0"></script>
+  <script src="/app.js?v=4.0"></script>
 </body>
 </html>

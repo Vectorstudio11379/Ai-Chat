@@ -1,4 +1,4 @@
-const CACHE_NAME = 'freellm-pwa-v2';
+const CACHE_NAME = 'freellm-pwa-v4';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
