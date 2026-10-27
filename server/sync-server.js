@@ -198,5 +198,17 @@ if (process.argv[1] && process.argv[1].endsWith('sync-server.js')) {
     console.log(`FreeLLMAPI Unified Developer Studio Server running on port ${port}`);
     console.log(`Data stored at: ${storagePath}`);
     console.log(`Providers loaded from environment.`);
+
+    // Option 1: Keep-Alive Self-Pinger for Render (keeps container awake)
+    const renderUrl = process.env.RENDER_EXTERNAL_URL || process.env.KEEP_ALIVE_URL;
+    if (renderUrl) {
+      const PING_INTERVAL_MS = 13 * 60 * 1000; // 13 minutes (Render sleeps after 15m)
+      console.log(`[Keep-Alive] Armed self-pinger for ${renderUrl} every 13 minutes`);
+      setInterval(() => {
+        fetch(`${renderUrl.replace(/\/$/, '')}/health`)
+          .then(r => console.log(`[Keep-Alive] Self-ping status: ${r.status}`))
+          .catch(e => console.warn(`[Keep-Alive] Ping warning:`, e.message));
+      }, PING_INTERVAL_MS);
+    }
   });
 }

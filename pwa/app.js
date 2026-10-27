@@ -1160,7 +1160,7 @@ function setupEventListeners() {
             <div class="tool-option-title">📊 Mortgage Rate Insights & Options</div>
             <div class="tool-option-desc">Comprehensive breakdown of 30-year vs 15-year fixed mortgage rates and trends.</div>
           </div>
-          <div class="tool-option-card" data-template="Review the following code for performance bottlenecks, security vulnerabilities, and code smell, then suggest refactored code:\n\n```js\n// Paste code here\n```">
+          <div class="tool-option-card" data-template="Review the following code for performance bottlenecks, security vulnerabilities, and code smell, then suggest refactored code:">
             <div class="tool-option-title">💻 Code Review & Security Audit</div>
             <div class="tool-option-desc">Deep static analysis and architectural improvements for any programming language.</div>
           </div>
@@ -1622,5 +1622,10 @@ function registerServiceWorker() {
     });
   }
 }
+
+// Option 1 Keep-Alive Ping: keeps Render container awake while app is open
+setInterval(() => {
+  fetch(`${getEffectiveBaseUrl()}/health`).catch(() => {});
+}, 10 * 60 * 1000);
 
 window.addEventListener('DOMContentLoaded', init);
