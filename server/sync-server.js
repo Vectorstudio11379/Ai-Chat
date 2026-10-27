@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import path from 'path';
 import fs from 'fs';
 import { createStore } from './db.js';
+import { createRouter } from './router.js';
 
 export function hashPassphrase(passphrase) {
   if (!passphrase) return '';
@@ -12,7 +13,7 @@ export function hashPassphrase(passphrase) {
 export function setCorsHeaders(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Sync-Passphrase, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Sync-Passphrase, Authorization, x-api-key');
 }
 
 export function parseJsonBody(req) {
@@ -25,7 +26,7 @@ export function parseJsonBody(req) {
       }
     });
     req.on('end', () => {
-      if (!data) return resolve({});
+      if (!data || !data.trim()) return resolve({});
       try {
         resolve(JSON.parse(data));
       } catch (err) {
@@ -67,9 +68,10 @@ function tryServeStatic(pathname, pwaDir, res) {
   return false;
 }
 
-export function createSyncServer({ store = createStore(), pwaDir = null } = {}) {
+export function createSyncServer({ store = createStore(), pwaDir = null, router = null } = {}) {
   // Default pwaDir to ./pwa if not passed
   const resolvedPwaDir = pwaDir || path.resolve(process.cwd(), 'pwa');
+  const activeRouter = router || createRouter();
 
   const server = http.createServer(async (req, res) => {
     setCorsHeaders(res);
@@ -86,7 +88,27 @@ export function createSyncServer({ store = createStore(), pwaDir = null } = {}) 
     // Health check
     if (pathname === '/health' && req.method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ status: 'ok', service: 'freellmapi-sync' }));
+      res.end(JSON.stringify({ status: 'ok', service: 'freellmapi-unified-studio' }));
+      return;
+    }
+
+    // Provider status endpoint for Developer Studio telemetry
+    if (pathname === '/api/providers' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ providers: activeRouter.getProviderStatus() }));
+      return;
+    }
+
+    // AI Proxy Endpoints: /v1/messages and /v1/chat/completions
+    if ((pathname === '/v1/messages' || pathname === '/v1/chat/completions') && req.method === 'POST') {
+      try {
+        const body = await parseJsonBody(req);
+        req.body = body;
+        await activeRouter.handleRequest(req, res);
+      } catch (err) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err.message || 'Invalid JSON body' }));
+      }
       return;
     }
 
@@ -147,7 +169,7 @@ export function createSyncServer({ store = createStore(), pwaDir = null } = {}) 
       }
     }
 
-    // Serve PWA Static Assets if available
+    // Serve PWA Static Assets on GET
     if (req.method === 'GET' && tryServeStatic(pathname, resolvedPwaDir, res)) {
       return;
     }
@@ -162,13 +184,14 @@ export function createSyncServer({ store = createStore(), pwaDir = null } = {}) 
 
 // When run directly as standalone service
 if (process.argv[1] && process.argv[1].endsWith('sync-server.js')) {
-  const port = process.env.SYNC_PORT || process.env.PORT || 3002;
+  const port = process.env.PORT || 3001;
   const storagePath = process.env.DATA_PATH || path.resolve(process.cwd(), 'data/chats.json');
   const store = createStore(storagePath);
   const server = createSyncServer({ store });
 
   server.listen(port, '0.0.0.0', () => {
-    console.log(`FreeLLMAPI Chat Sync & PWA Server running on port ${port}`);
+    console.log(`FreeLLMAPI Unified Developer Studio Server running on port ${port}`);
     console.log(`Data stored at: ${storagePath}`);
+    console.log(`Providers loaded from environment.`);
   });
 }
