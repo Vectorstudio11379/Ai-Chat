@@ -1,0 +1,16 @@
+{
+  "name": "freellmapi-render-pwa",
+  "version": "1.0.0",
+  "description": "FreeLLMAPI on Render with Claude Minimalist PWA and Cross-Device Sync",
+  "type": "module",
+  "scripts": {
+    "start": "node server/sync-server.js",
+    "generate-key": "node scripts/generate-env.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "vitest": "^3.0.5"
+  }
+}

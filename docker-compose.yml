@@ -1,0 +1,17 @@
+services:
+  freellmapi:
+    image: ghcr.io/tashfeenahmed/freellmapi:latest
+    container_name: freellmapi-gateway
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - HOST_BIND=0.0.0.0
+      - NODE_ENV=production
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+    volumes:
+      - freellmapi_data:/app/data
+
+volumes:
+  freellmapi_data:
