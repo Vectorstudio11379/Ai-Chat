@@ -1,70 +1,87 @@
-# Cloudflare Fast Coding AI Gateway Design
+# Cloudflare Fast Coding AI Gateway & PWA Design
 
 ## 1. Intent and the Why
-The goal is to provide a very fast, zero-cost cloud API for AI-assisted coding that can be called just like Claude AI (e.g. from code editors, tools like Continue/Cursor, or custom scripts).
+The goal is to build an ultra-fast, zero-cost AI coding solution that can be:
+1. Called directly by code editors, tools, and scripts using the **Anthropic Claude wire format** (`POST /v1/messages`).
+2. Installed as a **Progressive Web App (PWA)** on any device (iOS, Android, Windows, Mac) with a **Claude Minimalist** interface for coding assistance on the go.
 
-Free-tier container platforms like Render have severe compute limits (512 MB RAM, no GPU) and go to sleep after 15 minutes of inactivity, causing 30–50 second cold-start pauses on subsequent requests. To achieve blazing-fast responses and 100% free hosting without cold-start lag, we build an edge gateway on Cloudflare Workers backed by Groq's free ultra-fast LPU inference (streaming coding models at 300+ tokens/second).
+Cloudflare was selected over Render because Render's free tier sleeps after 15 minutes of inactivity (causing 30–50 second cold-start pauses), whereas Cloudflare runs globally on the edge with **0 ms cold starts**, instant response times, and generous free quotas (100,000 requests/day).
 
 ---
 
 ## 2. Goals, Non-Goals, and Anti-Goals
 
 ### Goals
-- **Claude-Compatible API:** Expose `POST /v1/messages` compatible with Claude's message payload format and Server-Sent Events (SSE) streaming output.
-- **Zero Cost:** Run entirely on free-tier services (Cloudflare Workers free tier: 100,000 requests/day; Groq free tier).
-- **Blazing Speed:** Start streaming code completions in under 300ms, outputting code at 300+ tokens per second.
-- **Zero Cold-Start:** Global edge execution on Cloudflare without sleep/wake-up delays.
-- **Easy Deployment:** Single-command setup using Cloudflare Wrangler CLI.
-- **Verification Support:** Include a lightweight local test runner and curl verification instructions.
+- **Zero Cold-Start:** Global edge execution on Cloudflare Workers with sub-30ms startup latency.
+- **Claude API Compatibility:** Expose `POST /v1/messages` accepting Anthropic messages payloads and streaming Server-Sent Events (SSE) back in Claude's event format.
+- **Ultra-Fast Free Inference:** Route coding requests to Groq's high-throughput LPU inference running state-of-the-art coding models (e.g., `qwen-2.5-coder-32b` or `llama-3.3-70b-versatile` at 300+ tokens/second).
+- **Installable PWA (Option B - Claude Minimalist):**
+  - Served directly from the root path (`/`) of the Worker.
+  - Manifest (`manifest.webmanifest`) and Service Worker (`sw.js`) enabling native installation on phones and desktops.
+  - Clean conversational UI with markdown formatting, syntax highlighting, and 1-click code copying.
+  - Real-time token streaming with model selection indicator.
+  - Client-side settings stored in `localStorage` (default endpoint, optional gateway protection key).
+- **Single-Command Deploy:** Simple deployment to Cloudflare using Wrangler CLI (`npm run deploy`).
+- **End-to-End Testing:** Unit tests for protocol transformation and a CLI test script.
 
 ### Non-Goals
-- Hosting or executing model weights on the worker itself (Cloudflare Workers has a 128 MB RAM limit per execution, not intended for local weight execution).
-- User authentication, user billing, or multi-tenant user accounts.
-- Fine-tuning or retraining model weights.
+- Hosting multi-gigabyte neural network weights directly in memory on Cloudflare (the Worker acts as an intelligent edge gateway).
+- Paid tiers, complex authentication databases, or user billing systems.
 
 ### Anti-Goals
-- Do not introduce cold-start latency (no sleeping container hosts).
-- Do not require paid credit cards or paid cloud instances.
+- Do not introduce cold-start latency (no sleeping containers).
+- Do not clutter the interface; adhere to Claude's clean, minimalist layout.
 
 ---
 
 ## 3. Constraints
-- **Cloudflare Workers Free Limits:** 100,000 requests per day, 10ms CPU time per request (network I/O wait during streaming does not count against CPU time limits).
-- **Groq Free Tier:** Rate limits according to Groq's free tier quotas (e.g., generous tokens-per-minute and requests-per-minute suitable for single-user or small team coding assistance).
-- **Schema Compatibility:** Request body must accept Anthropic Claude format (`messages`, `model`, `max_tokens`, `system`, `stream`, `temperature`) and translate seamlessly to the underlying provider.
+- **Cloudflare Workers Free Tier:** 100,000 requests/day, 128 MB RAM per execution, 10ms CPU time (streaming network I/O wait does not count against CPU time).
+- **Groq Free Tier:** Standard free-tier rate limits for tokens and requests.
+- **PWA Requirements:** Service Worker requires HTTPS (Cloudflare automatically provides free SSL certificates on `*.workers.dev` and custom domains).
 
 ---
 
 ## 4. Approaches Considered
 
-1. **Cloudflare Workers (Edge Gateway) + Groq [SELECTED]**
-   - *Why chosen:* Provides global edge routing with 0ms cold starts, generous 100k free requests daily, and taps into Groq's 300+ token/s coding models (e.g., Qwen 2.5 Coder 32B). Completely eliminates Render's idle freeze.
-
-2. **Render / Koyeb Container + Groq [REJECTED]**
-   - *Why rejected:* Render's free tier container sleeps after 15 minutes of inactivity and takes 30–50 seconds to boot on subsequent calls, breaking the requirement for a "very fast" coding assistant.
-
+1. **Cloudflare Workers + Embedded Minimalist PWA [SELECTED]**
+   - *Why chosen:* Best-in-class speed (0ms cold start), edge-routed token streaming at 300+ tokens/sec, and a single deploy that serves both the Claude API and the installable PWA app at no cost.
+2. **Render Web Service (Container) [REJECTED]**
+   - *Why rejected:* Render's free tier puts instances to sleep after 15 minutes of inactivity, introducing a 30–50 second wake-up freeze on the first prompt.
 3. **Hugging Face Spaces Free CPU (Self-Hosted Weights) [REJECTED]**
-   - *Why rejected:* Running quantized models on free CPU yields only 5–15 tokens per second and requires complex environment setups, which is far too slow for real-time coding flow.
+   - *Why rejected:* Generating code on free CPU runs at only 5–15 tokens per second, which is far too sluggish for interactive coding.
 
 ---
 
 ## 5. Architectural & Technical Decisions
 
-- **Runtime / Language:** TypeScript on Cloudflare Workers runtime.
+### Edge Architecture
+- **Runtime:** Cloudflare Workers (TypeScript / ESM).
 - **Project Tooling:** Cloudflare Wrangler (`wrangler`).
-- **Core Endpoints:**
-  - `GET /` & `GET /health`: Health check and status indicator.
-  - `POST /v1/messages`: Claude-compatible endpoint translating Anthropic request payloads into Groq chat completion format and proxying/translating SSE streams back in Claude SSE event format (`message_start`, `content_block_start`, `content_block_delta`, `message_delta`, `message_stop`).
-  - `POST /v1/chat/completions`: Optional OpenAI-compatible pass-through for editors/extensions that prefer OpenAI format.
-- **Default Coding Model:** `qwen-2.5-coder-32b` or `llama-3.3-70b-versatile` (configurable via environment variable `DEFAULT_MODEL`).
-- **Secrets & Configuration:**
-  - `GROQ_API_KEY`: Cloudflare secret or environment variable.
-  - Optional `API_KEY_PROTECTION`: Simple Bearer token header check so unauthorized users cannot spam your personal Groq quota.
+- **Endpoints:**
+  - `GET /`: Serves the installable Claude Minimalist PWA single-page application.
+  - `GET /manifest.webmanifest` & `GET /sw.js`: PWA configuration and service worker.
+  - `GET /health`: Health check and diagnostic status.
+  - `POST /v1/messages`: Claude-compatible endpoint. Translates Anthropic messages format to Groq format, invokes Groq, and transforms SSE chunks into Anthropic events in real time.
+  - `POST /v1/chat/completions`: Optional OpenAI-compatible pass-through.
+
+### PWA UI (Option B - Claude Minimalist)
+- **Design Philosophy:** Minimalist dark mode with subtle borders, generous typography, and code-first formatting.
+- **Core Elements:**
+  - Floating prompt input with multi-line auto-expand.
+  - Code blocks with syntax highlighting, language badge, and 1-click "Copy" button.
+  - Model selector pill (defaulting to `qwen-2.5-coder-32b`).
+  - Slide-out Settings drawer for gateway keys or custom endpoints.
+  - Native PWA "Install" button triggered when browser supports installation.
+
+### Configuration & Security
+- `GROQ_API_KEY`: Secret configured in Cloudflare environment.
+- `GATEWAY_KEY`: Optional secret to protect the endpoint from unauthorized public use if shared.
+- `DEFAULT_MODEL`: Configurable environment variable (default: `qwen-2.5-coder-32b`).
 
 ---
 
 ## 6. What's Left to the Builder
-- Detailed translation logic between Anthropic SSE event frames and OpenAI/Groq SSE frames.
-- Implementation of `src/index.ts` and `wrangler.toml`.
-- Local test script (`scripts/test-request.sh` or a node test script).
-- Step-by-step README explaining how to obtain a free Groq API key and deploy with `wrangler deploy`.
+- Detailed TypeScript implementation for protocol translation and SSE stream transformation.
+- PWA frontend HTML, CSS, JavaScript, manifest, and service worker.
+- Unit tests with Vitest verifying message translation and SSE framing.
+- Test script (`scripts/test-client.js`) and step-by-step `README.md`.
