@@ -10,9 +10,8 @@
     "test:watch": "vitest",
     "deploy:pages": "wrangler pages deploy pwa"
   },
-  "dependencies": {},
   "devDependencies": {
     "vitest": "^3.0.5",
-    "wrangler": "^3.109.2"
+    "wrangler": "^3.114.17"
   }
 }
