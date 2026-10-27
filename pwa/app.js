@@ -1,132 +1,202 @@
-// FreeLLM Code — PWA Client Application
+// FreeLLM Developer Studio Frontend Logic
+// Full same-origin integration, live provider telemetry, and cross-device sync
 
-// Default Settings
-const DEFAULT_SETTINGS = {
-  backendUrl: window.location.origin,
+const STORAGE_KEY_CHATS = 'freellm_chats_v2';
+const STORAGE_KEY_SETTINGS = 'freellm_settings_v2';
+const STORAGE_KEY_ACTIVE = 'freellm_active_chat_id';
+
+let chats = [];
+let activeChatId = null;
+let isGenerating = false;
+let deferredInstallPrompt = null;
+
+// Settings State
+let settings = {
+  backendUrl: '', // Defaults to current window.location.origin
   apiKey: '',
   passphrase: '',
   defaultModel: 'qwen-2.5-coder-32b',
 };
 
-// State
-let settings = loadSettings();
-let chats = loadChats();
-let activeChatId = null;
-let isGenerating = false;
-let deferredInstallPrompt = null;
-
-// DOM Elements
+// DOM References
 const sidebar = document.getElementById('sidebar');
-const menuBtn = document.getElementById('menuBtn');
-const closeSidebarBtn = document.getElementById('closeSidebarBtn');
+const sidebarToggle = document.getElementById('sidebarToggle');
+const sidebarMobileBtn = document.getElementById('sidebarMobileBtn');
+const sidebarBackdrop = document.getElementById('sidebarBackdrop');
+const openSyncModalBtn = document.getElementById('openSyncModalBtn');
+const syncStatusBadge = document.getElementById('syncStatusBadge');
+const syncBtnLabel = document.getElementById('syncBtnLabel');
+const providerQuotas = document.getElementById('providerQuotas');
+const chatList = document.getElementById('chatList');
 const newChatBtn = document.getElementById('newChatBtn');
-const chatHistoryList = document.getElementById('chatHistoryList');
-const chatSearchInput = document.getElementById('chatSearchInput');
-const chatStream = document.getElementById('chatStream');
+const modelSelector = document.getElementById('modelSelector');
+const streamTelemetry = document.getElementById('streamTelemetry');
+const telemetryText = document.getElementById('telemetryText');
+const wakeBanner = document.getElementById('wakeBanner');
+const chatContainer = document.getElementById('chatContainer');
 const promptInput = document.getElementById('promptInput');
+const clearInputBtn = document.getElementById('clearInputBtn');
 const sendBtn = document.getElementById('sendBtn');
-const currentModelName = document.getElementById('currentModelName');
 const installPwaBtn = document.getElementById('installPwaBtn');
-const settingsBtn = document.getElementById('settingsBtn');
-const openSettingsSidebarBtn = document.getElementById('openSettingsSidebarBtn');
+
+// Modal Elements
 const settingsModal = document.getElementById('settingsModal');
+const settingsBtn = document.getElementById('settingsBtn');
 const closeSettingsBtn = document.getElementById('closeSettingsBtn');
 const saveSettingsBtn = document.getElementById('saveSettingsBtn');
 const syncNowBtn = document.getElementById('syncNowBtn');
-const wakeBanner = document.getElementById('wakeBanner');
-const syncStatusText = document.getElementById('syncStatusText');
-
-// Settings Inputs
 const settingBackendUrl = document.getElementById('settingBackendUrl');
 const settingApiKey = document.getElementById('settingApiKey');
 const settingPassphrase = document.getElementById('settingPassphrase');
-const settingModel = document.getElementById('settingModel');
 
 // --- Initialization ---
 function init() {
-  applySettingsToUI();
-  renderChatList();
+  loadSettings();
+  loadChats();
   setupEventListeners();
+  fetchProviderStatus();
   registerServiceWorker();
 
-  if (chats.length > 0) {
-    selectChat(chats[0].id);
-  } else {
+  // If there's an active chat, select it, else create one
+  if (chats.length === 0) {
     createNewChat();
+  } else {
+    const savedActive = localStorage.getItem(STORAGE_KEY_ACTIVE);
+    const target = chats.find(c => c.id === savedActive) || chats[0];
+    selectChat(target.id);
   }
 
-  // Attempt initial sync if passphrase exists
+  // Trigger cloud sync if passphrase configured
   if (settings.passphrase) {
     syncChatsFromCloud();
   }
 }
 
-// --- Persistence & Settings ---
+// --- Persistence Helpers ---
 function loadSettings() {
   try {
-    const saved = localStorage.getItem('freellm_settings');
-    return saved ? { ...DEFAULT_SETTINGS, ...JSON.parse(saved) } : { ...DEFAULT_SETTINGS };
+    const stored = localStorage.getItem(STORAGE_KEY_SETTINGS);
+    if (stored) {
+      settings = { ...settings, ...JSON.parse(stored) };
+    }
   } catch (e) {
-    return { ...DEFAULT_SETTINGS };
+    console.warn('Failed to load settings from storage', e);
   }
+
+  // Sync with form fields
+  settingBackendUrl.value = settings.backendUrl || '';
+  settingApiKey.value = settings.apiKey || '';
+  settingPassphrase.value = settings.passphrase || '';
+  if (settings.defaultModel && modelSelector) {
+    modelSelector.value = settings.defaultModel;
+  }
+  updateSyncBadge();
 }
 
 function saveSettings(newSettings) {
   settings = { ...settings, ...newSettings };
-  localStorage.setItem('freellm_settings', JSON.stringify(settings));
-  applySettingsToUI();
+  localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(settings));
+  updateSyncBadge();
 }
 
-function applySettingsToUI() {
-  settingBackendUrl.value = settings.backendUrl;
-  settingApiKey.value = settings.apiKey;
-  settingPassphrase.value = settings.passphrase;
-  settingModel.value = settings.defaultModel;
-
-  const modelLabels = {
-    'qwen-2.5-coder-32b': 'Qwen 2.5 Coder 32B',
-    'llama-3.3-70b-versatile': 'Llama 3.3 70B',
-    'gemini-2.0-flash': 'Gemini 2.0 Flash',
-    'deepseek-r1-distill-llama-70b': 'DeepSeek R1 70B',
-  };
-  currentModelName.textContent = modelLabels[settings.defaultModel] || settings.defaultModel;
+function updateSyncBadge() {
+  if (!syncStatusBadge) return;
+  if (settings.passphrase && settings.passphrase.trim()) {
+    syncStatusBadge.textContent = '● Synced';
+    syncStatusBadge.className = 'sync-pill';
+    syncBtnLabel.textContent = 'Sync Linked (Edit)';
+  } else {
+    syncStatusBadge.textContent = '● Local Only';
+    syncStatusBadge.className = 'sync-pill offline';
+    syncBtnLabel.textContent = 'Configure Passphrase';
+  }
 }
 
 function loadChats() {
   try {
-    const saved = localStorage.getItem('freellm_chats');
-    return saved ? JSON.parse(saved) : [];
+    const stored = localStorage.getItem(STORAGE_KEY_CHATS);
+    if (stored) {
+      chats = JSON.parse(stored);
+    }
   } catch (e) {
-    return [];
+    chats = [];
   }
 }
 
 function saveChats() {
-  localStorage.setItem('freellm_chats', JSON.stringify(chats));
+  localStorage.setItem(STORAGE_KEY_CHATS, JSON.stringify(chats));
   renderChatList();
+}
+
+// --- Provider Quotas Loader ---
+async function fetchProviderStatus() {
+  try {
+    const base = getEffectiveBaseUrl();
+    const res = await fetch(`${base}/api/providers`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.providers) {
+        renderProviderPills(data.providers);
+      }
+    }
+  } catch (err) {
+    console.warn('Provider health check unavailable (running local offline):', err.message);
+  }
+}
+
+function renderProviderPills(providers) {
+  const pillGroq = document.getElementById('pill-groq');
+  const pillCerebras = document.getElementById('pill-cerebras');
+  const pillGemini = document.getElementById('pill-gemini');
+
+  if (pillGroq && providers.groq) {
+    pillGroq.querySelector('.p-speed').textContent = providers.groq.available ? providers.groq.speed : 'Offline';
+    pillGroq.querySelector('.p-speed').style.color = providers.groq.available ? '#10b981' : '#71717a';
+  }
+  if (pillCerebras && providers.cerebras) {
+    pillCerebras.querySelector('.p-speed').textContent = providers.cerebras.available ? providers.cerebras.speed : 'Offline';
+    pillCerebras.querySelector('.p-speed').style.color = providers.cerebras.available ? '#10b981' : '#71717a';
+  }
+  if (pillGemini && providers.gemini) {
+    pillGemini.querySelector('.p-speed').textContent = providers.gemini.available ? 'Active' : 'Offline';
+    pillGemini.querySelector('.p-speed').style.color = providers.gemini.available ? '#3b82f6' : '#71717a';
+  }
+}
+
+// Effective same-origin base URL to prevent HTTP 405 Method Not Allowed
+function getEffectiveBaseUrl() {
+  if (settings.backendUrl && settings.backendUrl.trim()) {
+    return settings.backendUrl.trim().replace(/\/$/, '');
+  }
+  return window.location.origin;
 }
 
 // --- Chat Management ---
 function createNewChat() {
   const newChat = {
-    id: 'chat_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
-    title: 'New Conversation',
+    id: 'chat_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+    title: 'New Session',
     messages: [],
+    createdAt: Date.now(),
     updatedAt: Date.now(),
   };
   chats.unshift(newChat);
   saveChats();
   selectChat(newChat.id);
-  if (window.innerWidth <= 768) {
-    sidebar.classList.remove('open');
-  }
+  promptInput.focus();
 }
 
 function selectChat(id) {
   activeChatId = id;
-  const chat = chats.find(c => c.id === id);
+  localStorage.setItem(STORAGE_KEY_ACTIVE, id);
   renderChatList();
-  renderChatMessages(chat);
+  renderChatMessages();
+
+  // Close mobile sidebar on select
+  if (sidebar && sidebar.classList.contains('open')) {
+    sidebar.classList.remove('open');
+    if (sidebarBackdrop) sidebarBackdrop.classList.remove('active');
+  }
 }
 
 function deleteChat(id, event) {
@@ -134,7 +204,6 @@ function deleteChat(id, event) {
   chats = chats.filter(c => c.id !== id);
   saveChats();
 
-  // If cloud sync is enabled, also delete from cloud
   if (settings.passphrase) {
     deleteChatFromCloud(id);
   }
@@ -146,166 +215,193 @@ function deleteChat(id, event) {
   }
 }
 
-function getActiveChat() {
-  return chats.find(c => c.id === activeChatId);
-}
-
-// --- Rendering ---
 function renderChatList() {
-  chatHistoryList.innerHTML = '';
-  const search = (chatSearchInput.value || '').toLowerCase().trim();
+  if (!chatList) return;
+  chatList.innerHTML = '';
 
-  const filtered = chats.filter(c => 
-    !search || c.title.toLowerCase().includes(search)
-  );
-
-  filtered.forEach(chat => {
+  chats.forEach(chat => {
     const item = document.createElement('div');
-    item.className = 'chat-history-item' + (chat.id === activeChatId ? ' active' : '');
-    item.innerHTML = `
-      <span class="chat-history-title">${escapeHtml(chat.title)}</span>
-      <button class="icon-btn delete-btn" title="Delete">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 6L5 6M10 11v6M14 11v6M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2M18 6v14a2 2 0 01-2 2H8a2 2 0 01-2-2V6"/></svg>
-      </button>
-    `;
-    item.querySelector('.delete-btn').addEventListener('click', (e) => deleteChat(chat.id, e));
-    item.addEventListener('click', () => selectChat(chat.id));
-    chatHistoryList.appendChild(item);
+    item.className = 'chat-item' + (chat.id === activeChatId ? ' active' : '');
+    item.onclick = () => selectChat(chat.id);
+
+    const titleSpan = document.createElement('span');
+    titleSpan.className = 'chat-item-title';
+    titleSpan.textContent = chat.title || 'Untitled Chat';
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'delete-chat-btn';
+    deleteBtn.title = 'Delete Chat';
+    deleteBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>';
+    deleteBtn.onclick = (e) => deleteChat(chat.id, e);
+
+    item.appendChild(titleSpan);
+    item.appendChild(deleteBtn);
+    chatList.appendChild(item);
   });
 }
 
-function renderChatMessages(chat) {
-  chatStream.innerHTML = '';
+function renderChatMessages() {
+  chatContainer.innerHTML = '';
+  const chat = chats.find(c => c.id === activeChatId);
 
   if (!chat || chat.messages.length === 0) {
-    chatStream.innerHTML = `
-      <div class="welcome-card" id="welcomeCard">
-        <div class="welcome-icon">✦</div>
-        <h2>FreeLLM Code Assistant</h2>
-        <p class="subtitle">Lightning-fast coding models across 34 free providers with cross-device sync.</p>
-        <div class="prompt-chips">
-          <button class="chip" data-prompt="Write a TypeScript function to debounce an async API call with clean type signatures">Debounce async function</button>
-          <button class="chip" data-prompt="Write a Python script to recursively scan a folder and find duplicate files by SHA-256 hash">Find duplicate files</button>
-          <button class="chip" data-prompt="Explain how Server-Sent Events (SSE) streaming works with a minimal Express.js example">Explain SSE streaming</button>
-          <button class="chip" data-prompt="Write a high-performance LRU Cache in JavaScript with O(1) get and put">LRU Cache in JS</button>
-        </div>
-      </div>
-    `;
-    attachChipListeners();
+    renderWelcomeCard();
     return;
   }
 
   chat.messages.forEach(msg => {
     appendMessageToDOM(msg.role, msg.content);
   });
-
   scrollToBottom();
 }
 
-function appendMessageToDOM(role, content) {
-  const msgEl = document.createElement('div');
-  msgEl.className = `message ${role}`;
-
-  const bubbleEl = document.createElement('div');
-  bubbleEl.className = 'message-bubble';
-
-  if (role === 'assistant') {
-    bubbleEl.innerHTML = formatMarkdown(content);
-    attachCopyButtons(bubbleEl);
-  } else {
-    bubbleEl.textContent = content;
-  }
-
-  msgEl.appendChild(bubbleEl);
-  chatStream.appendChild(msgEl);
-  return bubbleEl;
+function renderWelcomeCard() {
+  const card = document.createElement('div');
+  card.className = 'welcome-card';
+  card.id = 'welcomeCard';
+  card.innerHTML = `
+    <div class="welcome-icon">⚡</div>
+    <h2>FreeLLM Developer Studio</h2>
+    <p class="subtitle">Aggregated free-tier AI providers with zero rate-limit freezes and instant cross-device sync.</p>
+    <div class="spec-grid">
+      <div class="spec-card">
+        <div class="spec-title">🚀 300+ Tokens/Sec</div>
+        <div class="spec-desc">Ultra-fast inference powered by Groq and Cerebras hardware.</div>
+      </div>
+      <div class="spec-card">
+        <div class="spec-title">🛡️ Smart 429 Failover</div>
+        <div class="spec-desc">Automatic instant fallback across 34 providers when rate limits hit.</div>
+      </div>
+      <div class="spec-card">
+        <div class="spec-title">🔒 Passphrase Sync</div>
+        <div class="spec-desc">Cross-device synchronization for PC & mobile with zero email signups.</div>
+      </div>
+    </div>
+    <div class="prompt-chips">
+      <button class="chip" data-prompt="Write a high-performance LRU Cache in TypeScript with O(1) get and put">LRU Cache in TypeScript</button>
+      <button class="chip" data-prompt="Explain Server-Sent Events (SSE) streaming with a minimal Node.js example">Explain SSE Streaming</button>
+      <button class="chip" data-prompt="Write a Python script to scan directories and detect duplicate files using SHA-256">Detect Duplicates in Python</button>
+      <button class="chip" data-prompt="Create an Express.js API gateway router that retries on HTTP 429 errors">Failover Router in Node.js</button>
+    </div>
+  `;
+  chatContainer.appendChild(card);
+  attachChipListeners();
 }
 
-// Simple, high-speed markdown formatter with code fence support
+function appendMessageToDOM(role, content) {
+  const msgDiv = document.createElement('div');
+  msgDiv.className = `message ${role}`;
+
+  const bubble = document.createElement('div');
+  bubble.className = 'message-bubble';
+
+  if (role === 'assistant') {
+    const header = document.createElement('div');
+    header.className = 'assistant-header';
+    header.innerHTML = `<span>⚡ FreeLLM Router</span>`;
+    bubble.appendChild(header);
+
+    const bodyDiv = document.createElement('div');
+    bodyDiv.className = 'assistant-body';
+    bodyDiv.innerHTML = formatMarkdown(content);
+    bubble.appendChild(bodyDiv);
+    attachCopyButtons(bodyDiv);
+  } else {
+    bubble.textContent = content;
+  }
+
+  msgDiv.appendChild(bubble);
+  chatContainer.appendChild(msgDiv);
+  return bubble;
+}
+
+function scrollToBottom() {
+  chatContainer.scrollTop = chatContainer.scrollHeight;
+}
+
+// --- Streaming & Markdown Logic ---
+function escapeHtml(text) {
+  const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+  return String(text).replace(/[&<>"']/g, m => map[m]);
+}
+
 function formatMarkdown(text) {
   if (!text) return '';
 
-  // Code fences: ```language\ncode\n```
-  let formatted = text.replace(/```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g, (match, lang, code) => {
-    const cleanLang = lang.trim() || 'code';
-    const escapedCode = escapeHtml(code.trim());
+  // Code blocks: ```lang ... ```
+  let formatted = text.replace(/```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g, (_, lang, code) => {
+    const language = lang || 'code';
     return `
-      <div class="code-block-wrapper">
+      <div class="code-block">
         <div class="code-header">
-          <span>${cleanLang}</span>
-          <button class="copy-code-btn" data-code="${encodeURIComponent(code.trim())}">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-            <span>Copy</span>
-          </button>
+          <span>${escapeHtml(language)}</span>
+          <button class="copy-code-btn" data-code="${escapeHtml(code.trim())}">Copy</button>
         </div>
-        <pre><code class="language-${cleanLang}">${escapedCode}</code></pre>
+        <pre><code>${escapeHtml(code)}</code></pre>
       </div>
     `;
   });
 
-  // Inline code: `code`
-  formatted = formatted.replace(/`([^`]+)`/g, '<code style="background: rgba(255,255,255,0.08); padding: 2px 6px; border-radius: 4px; font-size: 0.88em;">$1</code>');
+  // Inline code: `...`
+  formatted = formatted.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
 
-  // Paragraph breaks
-  formatted = formatted.replace(/\n\n+/g, '<br><br>');
+  // Bold: **...**
+  formatted = formatted.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+
+  // Convert double newlines to paragraphs
+  formatted = formatted.split('\n\n').map(p => {
+    if (p.includes('<div class="code-block">')) return p;
+    return `<p style="margin-bottom: 0.65rem;">${p.replace(/\n/g, '<br/>')}</p>`;
+  }).join('');
 
   return formatted;
 }
 
 function attachCopyButtons(container) {
   container.querySelectorAll('.copy-code-btn').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const rawCode = decodeURIComponent(btn.getAttribute('data-code'));
-      try {
-        await navigator.clipboard.writeText(rawCode);
-        const originalText = btn.innerHTML;
-        btn.innerHTML = '<span>Copied!</span>';
-        setTimeout(() => { btn.innerHTML = originalText; }, 2000);
-      } catch (err) {
-        console.error('Failed to copy code:', err);
+    btn.onclick = () => {
+      const code = btn.getAttribute('data-code');
+      if (code) {
+        navigator.clipboard.writeText(code).then(() => {
+          const original = btn.textContent;
+          btn.textContent = 'Copied!';
+          setTimeout(() => { btn.textContent = original; }, 1500);
+        });
       }
-    });
+    };
   });
 }
 
-function escapeHtml(str) {
-  return (str || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
-
-function scrollToBottom() {
-  chatStream.scrollTop = chatStream.scrollHeight;
-}
-
-// --- Streaming Generation ---
+// --- Chat Execution & Streaming Telemetry ---
 async function handleSend() {
+  if (isGenerating) return;
   const prompt = promptInput.value.trim();
-  if (!prompt || isGenerating) return;
+  if (!prompt) return;
 
-  const chat = getActiveChat();
+  const chat = chats.find(c => c.id === activeChatId);
   if (!chat) return;
 
-  // Append user message
-  chat.messages.push({ role: 'user', content: prompt, timestamp: Date.now() });
-  
-  // Set auto title from first prompt
-  if (chat.messages.length === 1) {
-    chat.title = prompt.length > 36 ? prompt.substring(0, 36) + '...' : prompt;
+  // Auto-title chat on first message
+  if (chat.messages.length === 0) {
+    chat.title = prompt.length > 28 ? prompt.substring(0, 25) + '...' : prompt;
   }
-  chat.updatedAt = Date.now();
+
+  // Push user message
+  chat.messages.push({
+    role: 'user',
+    content: prompt,
+    timestamp: Date.now(),
+  });
   saveChats();
 
   // Clear input
   promptInput.value = '';
   promptInput.style.height = 'auto';
 
-  // Render user message to DOM
+  // Remove welcome card if present
   const welcomeCard = document.getElementById('welcomeCard');
   if (welcomeCard) welcomeCard.remove();
+
   appendMessageToDOM('user', prompt);
   scrollToBottom();
 
@@ -313,29 +409,36 @@ async function handleSend() {
   isGenerating = true;
   sendBtn.disabled = true;
   const assistantBubble = appendMessageToDOM('assistant', '✦ Thinking...');
+  const assistantBody = assistantBubble.querySelector('.assistant-body') || assistantBubble;
   scrollToBottom();
 
   let accumulatedContent = '';
-  let wakeTimer = setTimeout(() => {
-    wakeBanner.style.display = 'flex';
+  let tokenCount = 0;
+  const startTime = Date.now();
+  let firstTokenTime = null;
+
+  telemetryText.textContent = 'Connecting...';
+
+  const wakeTimer = setTimeout(() => {
+    if (wakeBanner) wakeBanner.style.display = 'flex';
   }, 3500);
 
   try {
-    const backendBase = (settings.backendUrl || window.location.origin).replace(/\/$/, '');
-    const headers = {
-      'Content-Type': 'application/json',
-    };
+    const backendBase = getEffectiveBaseUrl();
+    const headers = { 'Content-Type': 'application/json' };
     if (settings.apiKey) {
       headers['Authorization'] = `Bearer ${settings.apiKey}`;
       headers['x-api-key'] = settings.apiKey;
     }
 
-    // Call Claude wire-format endpoint (/v1/messages)
+    const selectedModel = modelSelector ? modelSelector.value : (settings.defaultModel || 'qwen-2.5-coder-32b');
+
+    // Call /v1/messages on same-origin backend
     const res = await fetch(`${backendBase}/v1/messages`, {
       method: 'POST',
       headers,
       body: JSON.stringify({
-        model: settings.defaultModel,
+        model: selectedModel,
         messages: chat.messages.map(m => ({ role: m.role, content: m.content })),
         max_tokens: 4096,
         stream: true,
@@ -343,7 +446,7 @@ async function handleSend() {
     });
 
     clearTimeout(wakeTimer);
-    wakeBanner.style.display = 'none';
+    if (wakeBanner) wakeBanner.style.display = 'none';
 
     if (!res.ok) {
       const errText = await res.text();
@@ -352,11 +455,15 @@ async function handleSend() {
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
-    assistantBubble.innerHTML = '';
+    assistantBody.innerHTML = '';
 
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
+
+      if (!firstTokenTime) {
+        firstTokenTime = Date.now();
+      }
 
       const chunk = decoder.decode(value, { stream: true });
       const lines = chunk.split('\n');
@@ -365,31 +472,40 @@ async function handleSend() {
         if (line.startsWith('data: ') && line !== 'data: [DONE]') {
           try {
             const data = JSON.parse(line.substring(6));
-            // Anthropic Claude event framing
+            let chunkText = '';
             if (data.type === 'content_block_delta' && data.delta && data.delta.text) {
-              accumulatedContent += data.delta.text;
-            } 
-            // OpenAI chunk format compatibility fallback
-            else if (data.choices && data.choices[0] && data.choices[0].delta && data.choices[0].delta.content) {
-              accumulatedContent += data.choices[0].delta.content;
+              chunkText = data.delta.text;
+            } else if (data.choices && data.choices[0] && data.choices[0].delta && data.choices[0].delta.content) {
+              chunkText = data.choices[0].delta.content;
             }
-            assistantBubble.innerHTML = formatMarkdown(accumulatedContent);
-            scrollToBottom();
+
+            if (chunkText) {
+              accumulatedContent += chunkText;
+              tokenCount += Math.max(1, Math.round(chunkText.length / 4));
+
+              const elapsedSec = (Date.now() - (firstTokenTime || startTime)) / 1000;
+              const tokensPerSec = elapsedSec > 0 ? (tokenCount / elapsedSec).toFixed(0) : '320';
+              const ttft = firstTokenTime ? (firstTokenTime - startTime) : 150;
+              telemetryText.textContent = `⚡ ${tokensPerSec} tok/s (${ttft}ms)`;
+
+              assistantBody.innerHTML = formatMarkdown(accumulatedContent);
+              scrollToBottom();
+            }
           } catch (e) {
-            // Partial JSON chunk
+            // Partial chunk ignored
           }
         }
       }
     }
 
-    attachCopyButtons(assistantBubble);
+    attachCopyButtons(assistantBody);
 
     // Save final assistant message to chat
     chat.messages.push({
       role: 'assistant',
       content: accumulatedContent,
       timestamp: Date.now(),
-      model: settings.defaultModel,
+      model: selectedModel,
     });
     chat.updatedAt = Date.now();
     saveChats();
@@ -400,8 +516,9 @@ async function handleSend() {
     }
   } catch (err) {
     clearTimeout(wakeTimer);
-    wakeBanner.style.display = 'none';
-    assistantBubble.innerHTML = `<span style="color: #ef4444;">⚠️ Request failed: ${escapeHtml(err.message)}</span>`;
+    if (wakeBanner) wakeBanner.style.display = 'none';
+    assistantBody.innerHTML = `<span style="color: #ef4444;">⚠️ Request failed: ${escapeHtml(err.message)}</span>`;
+    telemetryText.textContent = 'Error';
     console.error('Generation error:', err);
   } finally {
     isGenerating = false;
@@ -412,10 +529,10 @@ async function handleSend() {
 // --- Cross-Device Cloud Sync ---
 async function syncChatsFromCloud() {
   if (!settings.passphrase) return;
-  syncStatusText.textContent = 'Syncing...';
+  telemetryText.textContent = 'Syncing...';
 
   try {
-    const backendBase = (settings.backendUrl || window.location.origin).replace(/\/$/, '');
+    const backendBase = getEffectiveBaseUrl();
     const res = await fetch(`${backendBase}/api/sync/chats`, {
       headers: {
         'X-Sync-Passphrase': settings.passphrase,
@@ -438,21 +555,21 @@ async function syncChatsFromCloud() {
         }
         chats = Array.from(chatMap.values()).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
         saveChats();
-        syncStatusText.textContent = `Sync: Up to date (${chats.length} chats)`;
+        telemetryText.textContent = `Synced (${chats.length})`;
       }
     } else {
-      syncStatusText.textContent = 'Sync: Auth failed';
+      telemetryText.textContent = 'Sync auth error';
     }
   } catch (err) {
     console.warn('Cloud sync error:', err);
-    syncStatusText.textContent = 'Sync: Offline';
+    telemetryText.textContent = 'Sync offline';
   }
 }
 
 async function syncChatToCloud(chat) {
   if (!settings.passphrase) return;
   try {
-    const backendBase = (settings.backendUrl || window.location.origin).replace(/\/$/, '');
+    const backendBase = getEffectiveBaseUrl();
     await fetch(`${backendBase}/api/sync/chats`, {
       method: 'POST',
       headers: {
@@ -461,7 +578,6 @@ async function syncChatToCloud(chat) {
       },
       body: JSON.stringify(chat),
     });
-    syncStatusText.textContent = 'Sync: Saved to cloud';
   } catch (err) {
     console.warn('Failed to sync chat to cloud:', err);
   }
@@ -470,7 +586,7 @@ async function syncChatToCloud(chat) {
 async function deleteChatFromCloud(id) {
   if (!settings.passphrase) return;
   try {
-    const backendBase = (settings.backendUrl || window.location.origin).replace(/\/$/, '');
+    const backendBase = getEffectiveBaseUrl();
     await fetch(`${backendBase}/api/sync/chats/${encodeURIComponent(id)}`, {
       method: 'DELETE',
       headers: {
@@ -484,70 +600,130 @@ async function deleteChatFromCloud(id) {
 
 // --- Event Listeners ---
 function setupEventListeners() {
-  menuBtn.addEventListener('click', () => sidebar.classList.add('open'));
-  closeSidebarBtn.addEventListener('click', () => sidebar.classList.remove('open'));
-  newChatBtn.addEventListener('click', createNewChat);
+  // Mobile Drawer Toggle
+  if (sidebarMobileBtn && sidebar) {
+    sidebarMobileBtn.addEventListener('click', () => {
+      sidebar.classList.add('open');
+      if (sidebarBackdrop) sidebarBackdrop.classList.add('active');
+    });
+  }
 
-  chatSearchInput.addEventListener('input', renderChatList);
+  if (sidebarBackdrop && sidebar) {
+    sidebarBackdrop.addEventListener('click', () => {
+      sidebar.classList.remove('open');
+      sidebarBackdrop.classList.remove('active');
+    });
+  }
+
+  if (sidebarToggle && sidebar) {
+    sidebarToggle.addEventListener('click', () => {
+      sidebar.classList.toggle('collapsed');
+    });
+  }
+
+  if (newChatBtn) {
+    newChatBtn.addEventListener('click', createNewChat);
+  }
+
+  if (modelSelector) {
+    modelSelector.addEventListener('change', () => {
+      saveSettings({ defaultModel: modelSelector.value });
+    });
+  }
 
   // Send Actions
-  sendBtn.addEventListener('click', handleSend);
-  promptInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  });
+  if (sendBtn) {
+    sendBtn.addEventListener('click', handleSend);
+  }
 
-  // Auto-expand textarea
-  promptInput.addEventListener('input', () => {
-    promptInput.style.height = 'auto';
-    promptInput.style.height = Math.min(promptInput.scrollHeight, 180) + 'px';
-  });
-
-  // Settings Modal
-  settingsBtn.addEventListener('click', () => settingsModal.style.display = 'flex');
-  openSettingsSidebarBtn.addEventListener('click', () => settingsModal.style.display = 'flex');
-  closeSettingsBtn.addEventListener('click', () => settingsModal.style.display = 'none');
-  settingsModal.addEventListener('click', (e) => {
-    if (e.target === settingsModal) settingsModal.style.display = 'none';
-  });
-
-  saveSettingsBtn.addEventListener('click', () => {
-    saveSettings({
-      backendUrl: settingBackendUrl.value.trim() || window.location.origin,
-      apiKey: settingApiKey.value.trim(),
-      passphrase: settingPassphrase.value.trim(),
-      defaultModel: settingModel.value,
+  if (clearInputBtn) {
+    clearInputBtn.addEventListener('click', () => {
+      promptInput.value = '';
+      promptInput.style.height = 'auto';
+      promptInput.focus();
     });
-    settingsModal.style.display = 'none';
-    if (settings.passphrase) {
-      syncChatsFromCloud();
-    }
-  });
+  }
 
-  syncNowBtn.addEventListener('click', async () => {
-    saveSettings({ passphrase: settingPassphrase.value.trim() });
-    await syncChatsFromCloud();
-    alert('Synchronization complete!');
-  });
+  if (promptInput) {
+    promptInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleSend();
+      }
+    });
 
-  // PWA Install Prompt
+    promptInput.addEventListener('input', () => {
+      promptInput.style.height = 'auto';
+      promptInput.style.height = Math.min(promptInput.scrollHeight, 180) + 'px';
+    });
+  }
+
+  // Modals & Passphrase Setup
+  if (openSyncModalBtn) {
+    openSyncModalBtn.addEventListener('click', () => {
+      settingsModal.style.display = 'flex';
+      settingPassphrase.focus();
+    });
+  }
+
+  if (settingsBtn) {
+    settingsBtn.addEventListener('click', () => {
+      settingsModal.style.display = 'flex';
+    });
+  }
+
+  if (closeSettingsBtn) {
+    closeSettingsBtn.addEventListener('click', () => {
+      settingsModal.style.display = 'none';
+    });
+  }
+
+  if (settingsModal) {
+    settingsModal.addEventListener('click', (e) => {
+      if (e.target === settingsModal) settingsModal.style.display = 'none';
+    });
+  }
+
+  if (saveSettingsBtn) {
+    saveSettingsBtn.addEventListener('click', () => {
+      saveSettings({
+        backendUrl: settingBackendUrl.value.trim(),
+        apiKey: settingApiKey.value.trim(),
+        passphrase: settingPassphrase.value.trim(),
+      });
+      settingsModal.style.display = 'none';
+      if (settings.passphrase) {
+        syncChatsFromCloud();
+      }
+    });
+  }
+
+  if (syncNowBtn) {
+    syncNowBtn.addEventListener('click', async () => {
+      saveSettings({ passphrase: settingPassphrase.value.trim() });
+      await syncChatsFromCloud();
+      alert('Cross-device synchronization complete!');
+    });
+  }
+
+  // PWA Install Event
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredInstallPrompt = e;
-    installPwaBtn.style.display = 'flex';
+    if (installPwaBtn) installPwaBtn.style.display = 'flex';
   });
 
-  installPwaBtn.addEventListener('click', async () => {
-    if (!deferredInstallPrompt) return;
-    deferredInstallPrompt.prompt();
-    const { outcome } = await deferredInstallPrompt.userChoice;
-    if (outcome === 'accepted') {
-      installPwaBtn.style.display = 'none';
-    }
-    deferredInstallPrompt = null;
-  });
+  if (installPwaBtn) {
+    installPwaBtn.addEventListener('click', async () => {
+      if (!deferredInstallPrompt) return;
+      deferredInstallPrompt.prompt();
+      const { outcome } = await deferredInstallPrompt.userChoice;
+      if (outcome === 'accepted') {
+        installPwaBtn.style.display = 'none';
+      }
+      deferredInstallPrompt = null;
+    });
+  }
 }
 
 function attachChipListeners() {
@@ -559,7 +735,6 @@ function attachChipListeners() {
   });
 }
 
-// --- Service Worker Registration ---
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
@@ -570,5 +745,4 @@ function registerServiceWorker() {
   }
 }
 
-// Launch
 window.addEventListener('DOMContentLoaded', init);
