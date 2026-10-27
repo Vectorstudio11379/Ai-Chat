@@ -1,19 +1,24 @@
 services:
-  # FreeLLMAPI Backend Router (Multi-provider LLM gateway)
+  # FreeLLMAPI Unified Developer Studio & AI Gateway (Single URL for Desktop & Mobile)
   - type: web
-    name: freellmapi-gateway
-    runtime: image
-    image:
-      url: ghcr.io/tashfeenahmed/freellmapi:latest
+    name: freellmapi-studio
+    runtime: node
     plan: free
     region: oregon
-    healthCheckPath: /v1/models
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
     envVars:
       - key: PORT
         value: "3001"
-      - key: HOST_BIND
-        value: "0.0.0.0"
       - key: NODE_ENV
         value: "production"
+      # Upstream Free Provider Keys (Persists across Render restarts - never logged out)
+      - key: GROQ_API_KEY
+        sync: false
+      - key: CEREBRAS_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
       - key: ENCRYPTION_KEY
         generateValue: true

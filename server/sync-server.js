@@ -88,7 +88,7 @@ export function createSyncServer({ store = createStore(), pwaDir = null, router 
     // Health check
     if (pathname === '/health' && req.method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ status: 'ok', service: 'freellmapi-unified-studio' }));
+      res.end(JSON.stringify({ status: 'ok', service: 'freellmapi-sync' }));
       return;
     }
 

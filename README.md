@@ -1,6 +1,19 @@
-# FreeLLM Code — Ultra-Fast AI Coding on Render with PWA & Sync
+# FreeLLM Studio — AI Developer Workbench with Multi-Provider Failover & Cross-Device Sync
 
-Run an ultra-fast, zero-cost AI coding model backend on **Render**, speak the **Anthropic Claude API wire format** (`/v1/messages`), install the **Claude Minimalist Progressive Web App (PWA)** on any device, and keep your chat sessions synchronized across all your devices using a simple passphrase.
+A unified, self-hosted AI developer studio and router deployed on **Render**. It serves the **FreeLLM Developer Studio Web App** (Option A dark workbench), routes **Anthropic Claude API messages** (`/v1/messages`) and **OpenAI completions** (`/v1/chat/completions`) with automatic 429 failover, and keeps your chat sessions continuously synchronized across PC and mobile via a single secret passphrase.
+
+---
+
+## What Was Fixed
+
+1. **Permanently Resolved HTTP 405 (Method Not Allowed):**
+   - The web app and API router now live on the exact same origin (`https://your-service.onrender.com`). Requests to `/v1/messages` and `/v1/chat/completions` directly hit the active HTTP server, eliminating CORS preflight friction and static hosting 405 rejections.
+2. **Eliminated Container Reset / Logouts on Render:**
+   - Provider API keys (`GROQ_API_KEY`, `CEREBRAS_API_KEY`, `GEMINI_API_KEY`) are loaded directly from persistent environment variables on Render. When Render's free tier spins down or restarts, your keys and services boot ready-to-use without ever asking you to create an account or re-enter credentials.
+3. **FreeLLMAPI Developer Studio Interface (Option A):**
+   - Replaced simplistic minimalist UI with FreeLLMAPI's dark developer workbench (`#090a0f`, `#121319`, `#27272a`).
+   - Collapsible left sidebar displaying live provider quota meters (Groq 320 t/s, Cerebras 450 t/s, Gemini Active), chat threads, and sync passphrase badge (`● Synced`).
+   - Main workbench featuring model switcher, 429 auto-failover badge, real-time token speed telemetry (`⚡ 320 tok/s • 120ms TTFT`), and syntax-highlighted code blocks with 1-click copying.
 
 ---
 
@@ -8,139 +21,83 @@ Run an ultra-fast, zero-cost AI coding model backend on **Render**, speak the **
 
 ```
 ┌────────────────────────────────────────────────────────┐
-│  Any Client (Cursor / Claude Code / Continue / PWA)    │
+│  Any Client (Desktop PWA / Mobile PWA / Claude Code)   │
 └───────────────────────────┬────────────────────────────┘
-                            │ /v1/messages (Claude format)
+                            │ Same-Origin Requests (/v1/messages, /)
                             ▼
 ┌────────────────────────────────────────────────────────┐
-│  FreeLLMAPI on Render (Free Web Service)               │
-│  - Pools 34 free AI providers (Groq, Cerebras, Gemini) │
-│  - Streams 300+ tokens/sec on Qwen 2.5 Coder 32B       │
-│  - Automatic 429 rate-limit failover                   │
-└───────────────────────────┬────────────────────────────┘
-                            │ Sync API & Static PWA Serving
-                            ▼
-┌────────────────────────────────────────────────────────┐
-│  Claude Minimalist PWA + Cross-Device Sync             │
-│  - Installable on iOS, Android, Mac & Windows          │
-│  - Passphrase-protected cross-device chat sync         │
-│  - Syntax highlighting & 1-click code copying          │
+│  Unified FreeLLM Studio Service on Render              │
+│  - Serves Developer Studio PWA from /                  │
+│  - Routes /v1/messages with 429 Failover (Groq, etc.)  │
+│  - Synchronizes chats via SHA-256 Passphrase Hash      │
+│  - Keys persisted in Render Environment Variables      │
 └────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 1. Deploy FreeLLMAPI on Render (100% Free)
-
-### Step 1: Generate your Encryption Key
-FreeLLMAPI encrypts provider API keys using AES-256-GCM. Generate a 64-character key locally:
+## 1. Quick Local Start
 
 ```bash
-node scripts/generate-env.js
-```
+# 1. Install dependencies
+npm install
 
-Copy the generated `ENCRYPTION_KEY` printed in the terminal.
+# 2. Add your free keys to .env
+# (Get free keys from: console.groq.com, cloud.cerebras.ai, aistudio.google.com)
+GROQ_API_KEY=gsk_...
+CEREBRAS_API_KEY=csk_...
+GEMINI_API_KEY=AIzaSy_...
 
-### Step 2: Deploy to Render
-
-**Option A (Direct Docker Image — Fastest, 1 Minute):**
-1. Log in to [Render Dashboard](https://dashboard.render.com).
-2. Click **New +** → **Web Service** → Select **Existing Image**.
-3. Image URL:
-   ```
-   ghcr.io/tashfeenahmed/freellmapi:latest
-   ```
-4. Choose the **Free** instance type.
-5. In **Environment Variables**, add:
-   - `ENCRYPTION_KEY`: `<Your 64-character generated key>`
-   - `PORT`: `3001`
-   - `HOST_BIND`: `0.0.0.0`
-6. Click **Create Web Service**.
-
-**Option B (Blueprint via Git):**
-Push this repository to GitHub and select **New +** → **Blueprint** on Render. It will automatically detect `render.yaml`.
-
-Once deployed, your service will be live at `https://your-service.onrender.com`.
-
----
-
-## 2. Configure Free AI Providers (300+ Tokens/Sec)
-
-Open your deployed Render URL in your browser (`https://your-service.onrender.com`).
-1. Navigate to the **Keys** page.
-2. Add free API keys from top-speed providers:
-   - **[Groq Console](https://console.groq.com/keys)** *(Provides Qwen 2.5 Coder 32B at 300+ tokens/sec for free)*
-   - **[Google AI Studio](https://aistudio.google.com/app/apikey)** *(Provides Gemini 2.0 Flash for free)*
-   - **[Cerebras](https://cloud.cerebras.ai/)** *(Ultra-low latency Llama models)*
-   - **[OpenRouter](https://openrouter.ai/keys)** *(Free model endpoints)*
-3. Grab your **Unified API Key** from the header of the Keys page.
-
----
-
-## 3. Keep-Warm Setup (Eliminate the 15-Minute Render Sleep)
-
-Render's free tier goes to sleep after 15 minutes of idle time. To ensure **0ms instant response** 24/7:
-
-1. Go to [cron-job.org](https://cron-job.org) or [UptimeRobot](https://uptimerobot.com) (both 100% free).
-2. Create a new monitor/job:
-   - **URL:** `https://your-service.onrender.com/v1/models`
-   - **Interval:** Every **10 minutes**
-3. That's it! Your Render container will never go to sleep, giving you instant responses on every prompt.
-
----
-
-## 4. Install the Claude Minimalist PWA on Any Device
-
-The PWA provides a clean conversational coding workspace styled like Claude AI:
-
-### Start the PWA locally or on your server:
-```bash
+# 3. Start unified studio
 npm start
 ```
-By default, the PWA and sync server run on port `3002`.
 
-### Install on Mobile & Desktop:
-- **iPhone / iPad:** Open the web app in Safari → Tap **Share** (square with arrow) → Tap **Add to Home Screen**.
-- **Android:** Open in Chrome → Tap **Install App** or the menu (⋮) → **Install app**.
-- **Windows / Mac:** Open in Chrome or Edge → Click the **Install** button in the top navigation bar (or the install icon in the address bar).
+Open `http://localhost:3001` in your browser.
 
 ---
 
-## 5. Cross-Device Chat Synchronization
+## 2. Deploy to Render (100% Free & Persistent)
 
-You can start a coding session on your PC and continue it on your phone:
-1. Open the PWA and click the **Settings (gear)** icon.
-2. Enter your deployed **Render Backend URL** (e.g. `https://your-service.onrender.com`).
-3. Set your personal **Sync Passphrase** (any secret word of your choice).
-4. Enter the same passphrase on your other devices and click **Sync Now**.
-5. All your conversation threads and code snippets will automatically stay in sync in real time!
+1. Push this repository to your GitHub account.
+2. Log into the [Render Dashboard](https://dashboard.render.com).
+3. Click **New +** → **Blueprint** and select your repository. Render will automatically detect `render.yaml`.
+4. Under **Environment Variables**, provide your free provider keys:
+   - `GROQ_API_KEY`: Your key from [Groq Console](https://console.groq.com/keys) (300+ tok/sec Qwen 2.5 Coder)
+   - `CEREBRAS_API_KEY`: Your key from [Cerebras Cloud](https://cloud.cerebras.ai/) (Ultra-fast Llama 3.3)
+   - `GEMINI_API_KEY`: Your key from [Google AI Studio](https://aistudio.google.com/app/apikey)
+5. Click **Apply**.
+
+Your unified service will be live at:
+`https://your-service.onrender.com`
 
 ---
 
-## 6. Connect to Your Code Editors
+## 3. Keep-Warm Setup (0ms Cold Starts)
 
-Because FreeLLMAPI speaks the standard **Anthropic Messages wire format**, you can connect your favorite coding tools:
+To keep Render from going to sleep after 15 minutes of inactivity:
+1. Go to [cron-job.org](https://cron-job.org) or [UptimeRobot](https://uptimerobot.com) (both 100% free).
+2. Create an HTTP monitor:
+   - **URL:** `https://your-service.onrender.com/health`
+   - **Interval:** Every **10 minutes**
+3. Your service stays warm 24/7 with zero cold starts.
 
-### Claude Code CLI:
+---
+
+## 4. Cross-Device Passphrase Synchronization
+
+To sync chats across your PC and mobile phone:
+1. Open FreeLLM Studio in your browser on PC.
+2. In the left sidebar, click **Configure Passphrase** under "Cross-Device Sync".
+3. Enter any secret passphrase of your choice and click **Sync Now**.
+4. Open the same URL on your phone, enter that exact passphrase, and click **Sync Now**.
+5. All your conversations and code snippets will instantly sync across both devices.
+
+---
+
+## 5. Automated Verification
+
+Run the comprehensive test suite verifying the router, server integration, PWA structure, CSS tokens, and sync mechanics:
+
 ```bash
-npx freellmapi setup-claude --url https://your-service.onrender.com --api-key <your-unified-key>
-```
-
-### Cursor / Continue.dev:
-- **Base URL:** `https://your-service.onrender.com`
-- **Model:** `qwen-2.5-coder-32b` (or `claude-3-5-sonnet` which FreeLLMAPI maps automatically)
-- **API Key:** `<your-unified-key>`
-
----
-
-## 7. Verify with the Test Script
-
-Test streaming code generation directly from your terminal:
-
-```bash
-# Test local deployment
-node scripts/test-claude-request.js --url http://localhost:3001
-
-# Test deployed Render instance
-node scripts/test-claude-request.js --url https://your-service.onrender.com --key <your-unified-key>
+npm test
 ```

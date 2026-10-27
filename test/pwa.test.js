@@ -26,7 +26,7 @@ describe('Claude Minimalist PWA Frontend Assets', () => {
 
     const html = fs.readFileSync(indexPath, 'utf-8');
     expect(html).toContain('rel="manifest" href="/manifest.webmanifest"');
-    expect(html).toContain('id="chatStream"');
+    expect(html).toContain('id="chatContainer"');
     expect(html).toContain('id="promptInput"');
     expect(html).toContain('id="sendBtn"');
     expect(html).toContain('id="settingsModal"');
