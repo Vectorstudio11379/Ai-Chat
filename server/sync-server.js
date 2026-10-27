@@ -36,7 +36,41 @@ export function parseJsonBody(req) {
   });
 }
 
+const MIME_TYPES = {
+  '.html': 'text/html; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.js': 'application/javascript; charset=utf-8',
+  '.webmanifest': 'application/manifest+json; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.svg': 'image/svg+xml',
+  '.png': 'image/png',
+  '.ico': 'image/x-icon',
+};
+
+function tryServeStatic(pathname, pwaDir, res) {
+  if (!pwaDir) return false;
+
+  let relativePath = pathname === '/' ? '/index.html' : pathname;
+  // Prevent directory traversal
+  const safePath = path.normalize(relativePath).replace(/^(\.\.[/\\])+/, '');
+  const filePath = path.join(pwaDir, safePath);
+
+  if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+    const ext = path.extname(filePath).toLowerCase();
+    const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+    const content = fs.readFileSync(filePath);
+    res.writeHead(200, { 'Content-Type': contentType });
+    res.end(content);
+    return true;
+  }
+
+  return false;
+}
+
 export function createSyncServer({ store = createStore(), pwaDir = null } = {}) {
+  // Default pwaDir to ./pwa if not passed
+  const resolvedPwaDir = pwaDir || path.resolve(process.cwd(), 'pwa');
+
   const server = http.createServer(async (req, res) => {
     setCorsHeaders(res);
 
@@ -113,6 +147,11 @@ export function createSyncServer({ store = createStore(), pwaDir = null } = {}) 
       }
     }
 
+    // Serve PWA Static Assets if available
+    if (req.method === 'GET' && tryServeStatic(pathname, resolvedPwaDir, res)) {
+      return;
+    }
+
     // Default 404
     res.writeHead(404, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Not Found' }));
@@ -129,7 +168,7 @@ if (process.argv[1] && process.argv[1].endsWith('sync-server.js')) {
   const server = createSyncServer({ store });
 
   server.listen(port, '0.0.0.0', () => {
-    console.log(`FreeLLMAPI Chat Sync Server running on port ${port}`);
+    console.log(`FreeLLMAPI Chat Sync & PWA Server running on port ${port}`);
     console.log(`Data stored at: ${storagePath}`);
   });
 }

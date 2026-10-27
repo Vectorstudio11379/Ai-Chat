@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import http from 'http';
+import path from 'path';
 import { createSyncServer, hashPassphrase } from '../server/sync-server.js';
 import { createStore } from '../server/db.js';
 
@@ -10,7 +10,8 @@ describe('Cross-Device Chat Sync API', () => {
 
   beforeAll(async () => {
     const store = createStore(':memory:');
-    server = createSyncServer({ store });
+    const pwaDir = path.resolve(process.cwd(), 'pwa');
+    server = createSyncServer({ store, pwaDir });
     await new Promise((resolve) => {
       server.listen(0, '127.0.0.1', () => {
         port = server.address().port;
@@ -121,5 +122,29 @@ describe('Cross-Device Chat Sync API', () => {
     });
     const getBody = await getRes.json();
     expect(getBody.chats.find(c => c.id === 'session-abc-123')).toBeUndefined();
+  });
+
+  // Task 4: Static PWA Serving Tests
+  it('GET / serves pwa/index.html with text/html', async () => {
+    const res = await fetch(`${baseUrl}/`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toContain('text/html');
+    const html = await res.text();
+    expect(html).toContain('FreeLLM Code');
+  });
+
+  it('GET /manifest.webmanifest serves PWA manifest with application/manifest+json', async () => {
+    const res = await fetch(`${baseUrl}/manifest.webmanifest`);
+    expect(res.status).toBe(200);
+    const manifest = await res.json();
+    expect(manifest.name).toBe('FreeLLM Code');
+  });
+
+  it('GET /sw.js serves service worker with application/javascript', async () => {
+    const res = await fetch(`${baseUrl}/sw.js`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toContain('javascript');
+    const sw = await res.text();
+    expect(sw).toContain('addEventListener');
   });
 });
