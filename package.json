@@ -7,10 +7,12 @@
     "start": "node server/sync-server.js",
     "generate-key": "node scripts/generate-env.js",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "deploy:pages": "wrangler pages deploy pwa"
   },
   "dependencies": {},
   "devDependencies": {
-    "vitest": "^3.0.5"
+    "vitest": "^3.0.5",
+    "wrangler": "^3.109.2"
   }
 }
