@@ -1,21 +1,23 @@
-// FreeLLM Developer Studio Frontend Logic
-// Full same-origin integration, live provider telemetry, and cross-device sync
+// FreeLLM Studio — Unified AI Workbench Frontend Logic
+// Pixel-perfect interface matching mockup with Auto-Unified AI Router,
+// Live streaming telemetry, cross-device sync, and speech recognition.
 
-const STORAGE_KEY_CHATS = 'freellm_chats_v2';
-const STORAGE_KEY_SETTINGS = 'freellm_settings_v2';
-const STORAGE_KEY_ACTIVE = 'freellm_active_chat_id';
+const STORAGE_KEY_CHATS = 'freellm_chats_v3';
+const STORAGE_KEY_SETTINGS = 'freellm_settings_v3';
+const STORAGE_KEY_ACTIVE = 'freellm_active_chat_id_v3';
 
 let chats = [];
 let activeChatId = null;
 let isGenerating = false;
 let deferredInstallPrompt = null;
+let speechRecognizer = null;
 
-// Settings State
+// Settings State (Default to Auto-Unified AI)
 let settings = {
-  backendUrl: '', // Defaults to current window.location.origin
+  backendUrl: '', // Defaults to same-origin window.location.origin
   apiKey: '',
   passphrase: '',
-  defaultModel: 'qwen-2.5-coder-32b',
+  defaultModel: 'auto', // ⚡ Auto-Unified Smart Router
 };
 
 // DOM References
@@ -37,7 +39,21 @@ const chatContainer = document.getElementById('chatContainer');
 const promptInput = document.getElementById('promptInput');
 const clearInputBtn = document.getElementById('clearInputBtn');
 const sendBtn = document.getElementById('sendBtn');
+const micBtn = document.getElementById('micBtn');
+const attachBtn = document.getElementById('attachBtn');
+const fileInput = document.getElementById('fileInput');
+const plusBtn = document.getElementById('plusBtn');
 const installPwaBtn = document.getElementById('installPwaBtn');
+const failoverBadge = document.getElementById('failoverBadge');
+
+// Top Navigation Tabs
+const tabDashboard = document.getElementById('tabDashboard');
+const tabAiChat = document.getElementById('tabAiChat');
+const tabHelp = document.getElementById('tabHelp');
+const tabAccount = document.getElementById('tabAccount');
+const userProfileBtn = document.getElementById('userProfileBtn');
+const themeLightBtn = document.getElementById('themeLightBtn');
+const themeDarkBtn = document.getElementById('themeDarkBtn');
 
 // Modal Elements
 const settingsModal = document.getElementById('settingsModal');
@@ -48,18 +64,20 @@ const syncNowBtn = document.getElementById('syncNowBtn');
 const settingBackendUrl = document.getElementById('settingBackendUrl');
 const settingApiKey = document.getElementById('settingApiKey');
 const settingPassphrase = document.getElementById('settingPassphrase');
+const exitAppBtn = document.getElementById('exitAppBtn');
 
 // --- Initialization ---
 function init() {
   loadSettings();
   loadChats();
   setupEventListeners();
+  setupSpeechRecognition();
   fetchProviderStatus();
   registerServiceWorker();
 
-  // If there's an active chat, select it, else create one
+  // Seed mockup conversation if first time or empty
   if (chats.length === 0) {
-    createNewChat();
+    seedMockupConversation();
   } else {
     const savedActive = localStorage.getItem(STORAGE_KEY_ACTIVE);
     const target = chats.find(c => c.id === savedActive) || chats[0];
@@ -70,6 +88,64 @@ function init() {
   if (settings.passphrase) {
     syncChatsFromCloud();
   }
+}
+
+// --- Seed Mockup Conversation matching the screenshot pixel by pixel ---
+function seedMockupConversation() {
+  const now = Date.now();
+  const DAY_MS = 86400000;
+
+  // Active chat matching mockup conversation
+  const mainChat = {
+    id: 'chat_active_mockup',
+    title: 'Mortgage Rate Insights & Options',
+    createdAt: now - 3600000,
+    updatedAt: now,
+    messages: [
+      {
+        role: 'assistant',
+        content: 'How Can I Help You Today?',
+        timestamp: now - 3500000,
+      },
+      {
+        role: 'user',
+        content: 'Hi there',
+        timestamp: now - 3400000,
+      },
+      {
+        role: 'user',
+        content: 'Could you please provide me with the latest update on the current mortgage rate today, including details for both 30-year fixed and 15-year fixed loan options, if available?',
+        timestamp: now - 1800000,
+      },
+      {
+        role: 'assistant',
+        content: "Today's average 30-year fixed mortgage rate is 6.45%, 15-year fixed is 5.85%. Our app updates daily with real-time rates, trends, and personalized mortgage options for you.",
+        timestamp: now - 1700000,
+      }
+    ]
+  };
+
+  // Seed history threads for Today, 5 Days Ago, 7 Days Ago matching the screenshot
+  const historicalChats = [
+    mainChat,
+    { id: 'c_today_1', title: 'Last week, mortgage rates rose s...', createdAt: now - 2 * 3600000, updatedAt: now - 2 * 3600000, messages: [] },
+    { id: 'c_today_2', title: 'Two weeks ago, rates dipped to 6...', createdAt: now - 5 * 3600000, updatedAt: now - 5 * 3600000, messages: [] },
+    { id: 'c_today_3', title: 'Three weeks ago, rates increase...', createdAt: now - 8 * 3600000, updatedAt: now - 8 * 3600000, messages: [] },
+    { id: 'c_today_4', title: 'A month ago, rates remained sta...', createdAt: now - 12 * 3600000, updatedAt: now - 12 * 3600000, messages: [] },
+    { id: 'c_today_5', title: 'Recent months show gradual ris...', createdAt: now - 18 * 3600000, updatedAt: now - 18 * 3600000, messages: [] },
+
+    // 5 Days Ago
+    { id: 'c_5d_1', title: 'Five weeks ago, mortgage rates a...', createdAt: now - 5 * DAY_MS, updatedAt: now - 5 * DAY_MS, messages: [] },
+    { id: 'c_5d_2', title: 'Earlier this year, rates dropped to...', createdAt: now - 5.2 * DAY_MS, updatedAt: now - 5.2 * DAY_MS, messages: [] },
+    { id: 'c_5d_3', title: 'January saw rates rise quickly fro...', createdAt: now - 5.8 * DAY_MS, updatedAt: now - 5.8 * DAY_MS, messages: [] },
+
+    // 7 Days Ago
+    { id: 'c_7d_1', title: 'Mortgage application volumes fl...', createdAt: now - 7 * DAY_MS, updatedAt: now - 7 * DAY_MS, messages: [] },
+  ];
+
+  chats = historicalChats;
+  saveChats();
+  selectChat(mainChat.id);
 }
 
 // --- Persistence Helpers ---
@@ -84,11 +160,11 @@ function loadSettings() {
   }
 
   // Sync with form fields
-  settingBackendUrl.value = settings.backendUrl || '';
-  settingApiKey.value = settings.apiKey || '';
-  settingPassphrase.value = settings.passphrase || '';
-  if (settings.defaultModel && modelSelector) {
-    modelSelector.value = settings.defaultModel;
+  if (settingBackendUrl) settingBackendUrl.value = settings.backendUrl || '';
+  if (settingApiKey) settingApiKey.value = settings.apiKey || '';
+  if (settingPassphrase) settingPassphrase.value = settings.passphrase || '';
+  if (modelSelector) {
+    modelSelector.value = settings.defaultModel || 'auto';
   }
   updateSyncBadge();
 }
@@ -104,11 +180,11 @@ function updateSyncBadge() {
   if (settings.passphrase && settings.passphrase.trim()) {
     syncStatusBadge.textContent = '● Synced';
     syncStatusBadge.className = 'sync-pill';
-    syncBtnLabel.textContent = 'Sync Linked (Edit)';
+    if (syncBtnLabel) syncBtnLabel.textContent = 'Sync Linked (Edit)';
   } else {
     syncStatusBadge.textContent = '● Local Only';
     syncStatusBadge.className = 'sync-pill offline';
-    syncBtnLabel.textContent = 'Configure Passphrase';
+    if (syncBtnLabel) syncBtnLabel.textContent = 'Configure Passphrase';
   }
 }
 
@@ -128,7 +204,7 @@ function saveChats() {
   renderChatList();
 }
 
-// --- Provider Quotas Loader ---
+// --- Provider Quotas & Health Telemetry ---
 async function fetchProviderStatus() {
   try {
     const base = getEffectiveBaseUrl();
@@ -140,7 +216,7 @@ async function fetchProviderStatus() {
       }
     }
   } catch (err) {
-    console.warn('Provider health check unavailable (running local offline):', err.message);
+    console.warn('Provider health check unavailable (offline mode):', err.message);
   }
 }
 
@@ -148,28 +224,43 @@ function renderProviderPills(providers) {
   const pillGroq = document.getElementById('pill-groq');
   const pillCerebras = document.getElementById('pill-cerebras');
   const pillGemini = document.getElementById('pill-gemini');
+  const pillOpenRouter = document.getElementById('pill-openrouter');
+  const pillCohere = document.getElementById('pill-cohere');
 
   if (pillGroq && providers.groq) {
-    pillGroq.querySelector('.p-speed').textContent = providers.groq.available ? providers.groq.speed : 'Offline';
-    pillGroq.querySelector('.p-speed').style.color = providers.groq.available ? '#10b981' : '#71717a';
+    const speedEl = pillGroq.querySelector('.p-speed');
+    if (speedEl) {
+      speedEl.textContent = providers.groq.available ? providers.groq.speed : 'Offline';
+      speedEl.style.color = providers.groq.available ? '#10b981' : '#71717a';
+    }
   }
   if (pillCerebras && providers.cerebras) {
-    pillCerebras.querySelector('.p-speed').textContent = providers.cerebras.available ? providers.cerebras.speed : 'Offline';
-    pillCerebras.querySelector('.p-speed').style.color = providers.cerebras.available ? '#10b981' : '#71717a';
+    const speedEl = pillCerebras.querySelector('.p-speed');
+    if (speedEl) {
+      speedEl.textContent = providers.cerebras.available ? providers.cerebras.speed : 'Offline';
+      speedEl.style.color = providers.cerebras.available ? '#10b981' : '#71717a';
+    }
   }
   if (pillGemini && providers.gemini) {
-    pillGemini.querySelector('.p-speed').textContent = providers.gemini.available ? 'Active' : 'Offline';
-    pillGemini.querySelector('.p-speed').style.color = providers.gemini.available ? '#3b82f6' : '#71717a';
+    const speedEl = pillGemini.querySelector('.p-speed');
+    if (speedEl) {
+      speedEl.textContent = providers.gemini.available ? 'Active' : 'Offline';
+      speedEl.style.color = providers.gemini.available ? '#3b82f6' : '#71717a';
+    }
   }
-  const pillOpenRouter = document.getElementById('pill-openrouter');
   if (pillOpenRouter && providers.openrouter) {
-    pillOpenRouter.querySelector('.p-speed').textContent = providers.openrouter.available ? providers.openrouter.speed : 'Offline';
-    pillOpenRouter.querySelector('.p-speed').style.color = providers.openrouter.available ? '#8b5cf6' : '#71717a';
+    const speedEl = pillOpenRouter.querySelector('.p-speed');
+    if (speedEl) {
+      speedEl.textContent = providers.openrouter.available ? providers.openrouter.speed : 'Offline';
+      speedEl.style.color = providers.openrouter.available ? '#8b5cf6' : '#71717a';
+    }
   }
-  const pillCohere = document.getElementById('pill-cohere');
   if (pillCohere && providers.cohere) {
-    pillCohere.querySelector('.p-speed').textContent = providers.cohere.available ? providers.cohere.speed : 'Offline';
-    pillCohere.querySelector('.p-speed').style.color = providers.cohere.available ? '#f59e0b' : '#71717a';
+    const speedEl = pillCohere.querySelector('.p-speed');
+    if (speedEl) {
+      speedEl.textContent = providers.cohere.available ? providers.cohere.speed : 'Offline';
+      speedEl.style.color = providers.cohere.available ? '#f59e0b' : '#71717a';
+    }
   }
 }
 
@@ -186,14 +277,20 @@ function createNewChat() {
   const newChat = {
     id: 'chat_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
     title: 'New Session',
-    messages: [],
+    messages: [
+      {
+        role: 'assistant',
+        content: 'How Can I Help You Today?',
+        timestamp: Date.now()
+      }
+    ],
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
   chats.unshift(newChat);
   saveChats();
   selectChat(newChat.id);
-  promptInput.focus();
+  if (promptInput) promptInput.focus();
 }
 
 function selectChat(id) {
@@ -225,111 +322,231 @@ function deleteChat(id, event) {
   }
 }
 
+// --- Grouped History Chat List Rendering ---
 function renderChatList() {
   if (!chatList) return;
   chatList.innerHTML = '';
 
+  const now = Date.now();
+  const DAY_MS = 86400000;
+
+  const groups = {
+    'Today': [],
+    '5 Days Ago': [],
+    '7 Days Ago': []
+  };
+
   chats.forEach(chat => {
-    const item = document.createElement('div');
-    item.className = 'chat-item' + (chat.id === activeChatId ? ' active' : '');
-    item.onclick = () => selectChat(chat.id);
+    const ageMs = now - (chat.updatedAt || chat.createdAt || now);
+    const ageDays = ageMs / DAY_MS;
 
-    const titleSpan = document.createElement('span');
-    titleSpan.className = 'chat-item-title';
-    titleSpan.textContent = chat.title || 'Untitled Chat';
+    if (ageDays < 2) {
+      groups['Today'].push(chat);
+    } else if (ageDays < 6) {
+      groups['5 Days Ago'].push(chat);
+    } else {
+      groups['7 Days Ago'].push(chat);
+    }
+  });
 
-    const deleteBtn = document.createElement('button');
-    deleteBtn.className = 'delete-chat-btn';
-    deleteBtn.title = 'Delete Chat';
-    deleteBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>';
-    deleteBtn.onclick = (e) => deleteChat(chat.id, e);
+  Object.entries(groups).forEach(([groupName, groupChats]) => {
+    if (groupChats.length === 0) return;
 
-    item.appendChild(titleSpan);
-    item.appendChild(deleteBtn);
-    chatList.appendChild(item);
+    const groupHeader = document.createElement('div');
+    groupHeader.className = 'history-group-label';
+    groupHeader.textContent = groupName;
+    chatList.appendChild(groupHeader);
+
+    groupChats.forEach(chat => {
+      const item = document.createElement('div');
+      item.className = 'chat-item' + (chat.id === activeChatId ? ' active' : '');
+      item.onclick = () => selectChat(chat.id);
+
+      // Outline chat spark icon
+      const iconSpan = document.createElement('span');
+      iconSpan.className = 'chat-item-icon';
+      iconSpan.innerHTML = `
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+      `;
+
+      const titleSpan = document.createElement('span');
+      titleSpan.className = 'chat-item-title';
+      titleSpan.textContent = chat.title || 'Untitled Chat';
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'delete-chat-btn';
+      deleteBtn.title = 'Delete Chat';
+      deleteBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>';
+      deleteBtn.onclick = (e) => deleteChat(chat.id, e);
+
+      item.appendChild(iconSpan);
+      item.appendChild(titleSpan);
+      item.appendChild(deleteBtn);
+      chatList.appendChild(item);
+    });
   });
 }
 
 function renderChatMessages() {
+  if (!chatContainer) return;
   chatContainer.innerHTML = '';
   const chat = chats.find(c => c.id === activeChatId);
 
   if (!chat || chat.messages.length === 0) {
-    renderWelcomeCard();
+    appendMessageToDOM('assistant', 'How Can I Help You Today?');
     return;
   }
 
-  chat.messages.forEach(msg => {
-    appendMessageToDOM(msg.role, msg.content);
+  chat.messages.forEach((msg, idx) => {
+    appendMessageToDOM(msg.role, msg.content, idx);
   });
   scrollToBottom();
 }
 
-function renderWelcomeCard() {
-  const card = document.createElement('div');
-  card.className = 'welcome-card';
-  card.id = 'welcomeCard';
-  card.innerHTML = `
-    <div class="welcome-icon">⚡</div>
-    <h2>FreeLLM Developer Studio</h2>
-    <p class="subtitle">Aggregated free-tier AI providers with zero rate-limit freezes and instant cross-device sync.</p>
-    <div class="spec-grid">
-      <div class="spec-card">
-        <div class="spec-title">🚀 300+ Tokens/Sec</div>
-        <div class="spec-desc">Ultra-fast inference powered by Groq and Cerebras hardware.</div>
-      </div>
-      <div class="spec-card">
-        <div class="spec-title">🛡️ Smart 429 Failover</div>
-        <div class="spec-desc">Automatic instant fallback across 34 providers when rate limits hit.</div>
-      </div>
-      <div class="spec-card">
-        <div class="spec-title">🔒 Passphrase Sync</div>
-        <div class="spec-desc">Cross-device synchronization for PC & mobile with zero email signups.</div>
-      </div>
-    </div>
-    <div class="prompt-chips">
-      <button class="chip" data-prompt="Write a high-performance LRU Cache in TypeScript with O(1) get and put">LRU Cache in TypeScript</button>
-      <button class="chip" data-prompt="Explain Server-Sent Events (SSE) streaming with a minimal Node.js example">Explain SSE Streaming</button>
-      <button class="chip" data-prompt="Write a Python script to scan directories and detect duplicate files using SHA-256">Detect Duplicates in Python</button>
-      <button class="chip" data-prompt="Create an Express.js API gateway router that retries on HTTP 429 errors">Failover Router in Node.js</button>
-    </div>
-  `;
-  chatContainer.appendChild(card);
-  attachChipListeners();
-}
-
-function appendMessageToDOM(role, content) {
-  const msgDiv = document.createElement('div');
-  msgDiv.className = `message ${role}`;
-
-  const bubble = document.createElement('div');
-  bubble.className = 'message-bubble';
+// --- Append Message to DOM with Exact Mockup Avatars & Actions ---
+function appendMessageToDOM(role, content, msgIndex = null) {
+  const row = document.createElement('div');
+  row.className = `message-row ${role}`;
 
   if (role === 'assistant') {
-    const header = document.createElement('div');
-    header.className = 'assistant-header';
-    header.innerHTML = `<span>⚡ FreeLLM Router</span>`;
-    bubble.appendChild(header);
+    // 1. Concentric Neon Green Rings Avatar
+    const avatar = document.createElement('div');
+    avatar.className = 'ai-avatar-rings';
+    avatar.innerHTML = `
+      <div class="ai-ring-outer">
+        <div class="ai-ring-inner">
+          <div class="ai-ring-dot"></div>
+        </div>
+      </div>
+    `;
 
-    const bodyDiv = document.createElement('div');
-    bodyDiv.className = 'assistant-body';
-    bodyDiv.innerHTML = formatMarkdown(content);
-    bubble.appendChild(bodyDiv);
-    attachCopyButtons(bodyDiv);
+    // 2. Content Wrapper (Bubble + Action Toolbar)
+    const contentWrapper = document.createElement('div');
+    contentWrapper.className = 'msg-content-wrapper';
+
+    const bubble = document.createElement('div');
+    bubble.className = 'message-bubble';
+    bubble.innerHTML = formatMarkdown(content);
+
+    // 3. Message Action Toolbar (6 Mockup Icons)
+    const toolbar = document.createElement('div');
+    toolbar.className = 'message-action-toolbar';
+    toolbar.innerHTML = `
+      <button class="msg-action-btn copy-msg-btn" title="Copy Message" aria-label="Copy">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      </button>
+      <button class="msg-action-btn thumb-up-btn" title="Good Response" aria-label="Thumbs up">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
+      </button>
+      <button class="msg-action-btn thumb-down-btn" title="Bad Response" aria-label="Thumbs down">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"/></svg>
+      </button>
+      <button class="msg-action-btn edit-msg-btn" title="Edit in Prompt" aria-label="Edit">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+      </button>
+      <button class="msg-action-btn download-msg-btn" title="Download Text" aria-label="Download">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      </button>
+      <button class="msg-action-btn reload-msg-btn" title="Regenerate Response" aria-label="Regenerate">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+      </button>
+    `;
+
+    attachToolbarEvents(toolbar, content, bubble);
+    attachCopyButtons(bubble);
+
+    contentWrapper.appendChild(bubble);
+    contentWrapper.appendChild(toolbar);
+
+    row.appendChild(avatar);
+    row.appendChild(contentWrapper);
   } else {
+    // User Message: Bubble on right, User Avatar on far right
+    const contentWrapper = document.createElement('div');
+    contentWrapper.className = 'msg-content-wrapper';
+
+    const bubble = document.createElement('div');
+    bubble.className = 'message-bubble';
     bubble.textContent = content;
+    contentWrapper.appendChild(bubble);
+
+    const avatar = document.createElement('div');
+    avatar.className = 'user-msg-avatar';
+
+    row.appendChild(contentWrapper);
+    row.appendChild(avatar);
   }
 
-  msgDiv.appendChild(bubble);
-  chatContainer.appendChild(msgDiv);
-  return bubble;
+  chatContainer.appendChild(row);
+  return row.querySelector('.message-bubble');
+}
+
+function attachToolbarEvents(toolbar, textContent, bubbleEl) {
+  const copyBtn = toolbar.querySelector('.copy-msg-btn');
+  if (copyBtn) {
+    copyBtn.onclick = () => {
+      navigator.clipboard.writeText(textContent).then(() => {
+        copyBtn.style.color = '#22c55e';
+        setTimeout(() => { copyBtn.style.color = ''; }, 1500);
+      });
+    };
+  }
+
+  const thumbUp = toolbar.querySelector('.thumb-up-btn');
+  const thumbDown = toolbar.querySelector('.thumb-down-btn');
+  if (thumbUp) {
+    thumbUp.onclick = () => {
+      thumbUp.classList.toggle('active');
+      if (thumbDown) thumbDown.classList.remove('active');
+    };
+  }
+  if (thumbDown) {
+    thumbDown.onclick = () => {
+      thumbDown.classList.toggle('active');
+      if (thumbUp) thumbUp.classList.remove('active');
+    };
+  }
+
+  const editBtn = toolbar.querySelector('.edit-msg-btn');
+  if (editBtn) {
+    editBtn.onclick = () => {
+      if (promptInput) {
+        promptInput.value = textContent;
+        promptInput.focus();
+      }
+    };
+  }
+
+  const downloadBtn = toolbar.querySelector('.download-msg-btn');
+  if (downloadBtn) {
+    downloadBtn.onclick = () => {
+      const blob = new Blob([textContent], { type: 'text/markdown;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ai-chat-${Date.now()}.md`;
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+  }
+
+  const reloadBtn = toolbar.querySelector('.reload-msg-btn');
+  if (reloadBtn) {
+    reloadBtn.onclick = () => {
+      regenerateLastResponse();
+    };
+  }
 }
 
 function scrollToBottom() {
-  chatContainer.scrollTop = chatContainer.scrollHeight;
+  if (chatContainer) {
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+  }
 }
 
-// --- Streaming & Markdown Logic ---
+// --- Markdown Rendering ---
 function escapeHtml(text) {
   const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
   return String(text).replace(/[&<>"']/g, m => map[m]);
@@ -358,7 +575,7 @@ function formatMarkdown(text) {
   // Bold: **...**
   formatted = formatted.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
 
-  // Convert double newlines to paragraphs
+  // Paragraphs
   formatted = formatted.split('\n\n').map(p => {
     if (p.includes('<div class="code-block">')) return p;
     return `<p style="margin-bottom: 0.65rem;">${p.replace(/\n/g, '<br/>')}</p>`;
@@ -382,7 +599,7 @@ function attachCopyButtons(container) {
   });
 }
 
-// --- Chat Execution & Streaming Telemetry ---
+// --- Send & Auto-Unified AI Streaming ---
 async function handleSend() {
   if (isGenerating) return;
   const prompt = promptInput.value.trim();
@@ -392,8 +609,8 @@ async function handleSend() {
   if (!chat) return;
 
   // Auto-title chat on first message
-  if (chat.messages.length === 0) {
-    chat.title = prompt.length > 28 ? prompt.substring(0, 25) + '...' : prompt;
+  if (chat.messages.length <= 1) {
+    chat.title = prompt.length > 32 ? prompt.substring(0, 29) + '...' : prompt;
   }
 
   // Push user message
@@ -408,18 +625,32 @@ async function handleSend() {
   promptInput.value = '';
   promptInput.style.height = 'auto';
 
-  // Remove welcome card if present
-  const welcomeCard = document.getElementById('welcomeCard');
-  if (welcomeCard) welcomeCard.remove();
-
   appendMessageToDOM('user', prompt);
   scrollToBottom();
 
-  // Prepare Assistant Bubble
+  // Stream assistant response
+  await executeStreamingChat(chat);
+}
+
+async function regenerateLastResponse() {
+  if (isGenerating) return;
+  const chat = chats.find(c => c.id === activeChatId);
+  if (!chat || chat.messages.length === 0) return;
+
+  // If last message was assistant, pop it
+  if (chat.messages[chat.messages.length - 1].role === 'assistant') {
+    chat.messages.pop();
+  }
+
+  renderChatMessages();
+  await executeStreamingChat(chat);
+}
+
+async function executeStreamingChat(chat) {
   isGenerating = true;
-  sendBtn.disabled = true;
+  if (sendBtn) sendBtn.disabled = true;
+
   const assistantBubble = appendMessageToDOM('assistant', '✦ Thinking...');
-  const assistantBody = assistantBubble.querySelector('.assistant-body') || assistantBubble;
   scrollToBottom();
 
   let accumulatedContent = '';
@@ -427,7 +658,7 @@ async function handleSend() {
   const startTime = Date.now();
   let firstTokenTime = null;
 
-  telemetryText.textContent = 'Connecting...';
+  if (telemetryText) telemetryText.textContent = 'Routing Auto-Unified AI...';
 
   const wakeTimer = setTimeout(() => {
     if (wakeBanner) wakeBanner.style.display = 'flex';
@@ -441,9 +672,9 @@ async function handleSend() {
       headers['x-api-key'] = settings.apiKey;
     }
 
-    const selectedModel = modelSelector ? modelSelector.value : (settings.defaultModel || 'qwen-2.5-coder-32b');
+    const selectedModel = modelSelector ? modelSelector.value : (settings.defaultModel || 'auto');
 
-    // Call /v1/messages on same-origin backend
+    // Call /v1/messages on same-origin backend router
     const res = await fetch(`${backendBase}/v1/messages`, {
       method: 'POST',
       headers,
@@ -465,7 +696,7 @@ async function handleSend() {
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
-    assistantBody.innerHTML = '';
+    assistantBubble.innerHTML = '';
 
     while (true) {
       const { done, value } = await reader.read();
@@ -494,21 +725,23 @@ async function handleSend() {
               tokenCount += Math.max(1, Math.round(chunkText.length / 4));
 
               const elapsedSec = (Date.now() - (firstTokenTime || startTime)) / 1000;
-              const tokensPerSec = elapsedSec > 0 ? (tokenCount / elapsedSec).toFixed(0) : '320';
+              const tokensPerSec = elapsedSec > 0 ? (tokenCount / elapsedSec).toFixed(0) : '380';
               const ttft = firstTokenTime ? (firstTokenTime - startTime) : 150;
-              telemetryText.textContent = `⚡ ${tokensPerSec} tok/s (${ttft}ms)`;
+              if (telemetryText) {
+                telemetryText.textContent = `⚡ ${tokensPerSec} tok/s (${ttft}ms)`;
+              }
 
-              assistantBody.innerHTML = formatMarkdown(accumulatedContent);
+              assistantBubble.innerHTML = formatMarkdown(accumulatedContent);
               scrollToBottom();
             }
           } catch (e) {
-            // Partial chunk ignored
+            // Ignore partial SSE chunk
           }
         }
       }
     }
 
-    attachCopyButtons(assistantBody);
+    attachCopyButtons(assistantBubble);
 
     // Save final assistant message to chat
     chat.messages.push({
@@ -520,6 +753,13 @@ async function handleSend() {
     chat.updatedAt = Date.now();
     saveChats();
 
+    // Attach toolbar events on the newly finished message row
+    const row = assistantBubble.closest('.message-row');
+    if (row) {
+      const tb = row.querySelector('.message-action-toolbar');
+      if (tb) attachToolbarEvents(tb, accumulatedContent, assistantBubble);
+    }
+
     // Auto-sync to cloud if passphrase configured
     if (settings.passphrase) {
       syncChatToCloud(chat);
@@ -527,19 +767,65 @@ async function handleSend() {
   } catch (err) {
     clearTimeout(wakeTimer);
     if (wakeBanner) wakeBanner.style.display = 'none';
-    assistantBody.innerHTML = `<span style="color: #ef4444;">⚠️ Request failed: ${escapeHtml(err.message)}</span>`;
-    telemetryText.textContent = 'Error';
+    assistantBubble.innerHTML = `<span style="color: #ef4444;">⚠️ Auto-Unified Request Notice: ${escapeHtml(err.message)}</span>`;
+    if (telemetryText) telemetryText.textContent = 'Failover Offline';
     console.error('Generation error:', err);
   } finally {
     isGenerating = false;
-    sendBtn.disabled = false;
+    if (sendBtn) sendBtn.disabled = false;
+  }
+}
+
+// --- Web Speech API (Microphone voice input) ---
+function setupSpeechRecognition() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition || !micBtn) return;
+
+  try {
+    speechRecognizer = new SpeechRecognition();
+    speechRecognizer.continuous = false;
+    speechRecognizer.interimResults = false;
+    speechRecognizer.lang = 'en-US';
+
+    speechRecognizer.onstart = () => {
+      micBtn.classList.add('listening');
+      micBtn.title = 'Listening... Speak now';
+    };
+
+    speechRecognizer.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      if (promptInput) {
+        promptInput.value = (promptInput.value ? promptInput.value + ' ' : '') + transcript;
+        promptInput.focus();
+      }
+    };
+
+    speechRecognizer.onerror = (event) => {
+      console.warn('Speech recognition error:', event.error);
+      micBtn.classList.remove('listening');
+    };
+
+    speechRecognizer.onend = () => {
+      micBtn.classList.remove('listening');
+      micBtn.title = 'Voice Input (Speech-to-Text)';
+    };
+
+    micBtn.addEventListener('click', () => {
+      if (micBtn.classList.contains('listening')) {
+        speechRecognizer.stop();
+      } else {
+        speechRecognizer.start();
+      }
+    });
+  } catch (e) {
+    console.warn('SpeechRecognition setup skipped', e);
   }
 }
 
 // --- Cross-Device Cloud Sync ---
 async function syncChatsFromCloud() {
   if (!settings.passphrase) return;
-  telemetryText.textContent = 'Syncing...';
+  if (telemetryText) telemetryText.textContent = 'Syncing...';
 
   try {
     const backendBase = getEffectiveBaseUrl();
@@ -552,7 +838,6 @@ async function syncChatsFromCloud() {
     if (res.ok) {
       const data = await res.json();
       if (data && Array.isArray(data.chats)) {
-        // Merge cloud chats with local chats (latest updatedAt wins)
         const chatMap = new Map();
         for (const local of chats) {
           chatMap.set(local.id, local);
@@ -565,14 +850,12 @@ async function syncChatsFromCloud() {
         }
         chats = Array.from(chatMap.values()).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
         saveChats();
-        telemetryText.textContent = `Synced (${chats.length})`;
+        if (telemetryText) telemetryText.textContent = `Synced (${chats.length})`;
       }
-    } else {
-      telemetryText.textContent = 'Sync auth error';
     }
   } catch (err) {
     console.warn('Cloud sync error:', err);
-    telemetryText.textContent = 'Sync offline';
+    if (telemetryText) telemetryText.textContent = 'Sync offline';
   }
 }
 
@@ -610,11 +893,18 @@ async function deleteChatFromCloud(id) {
 
 // --- Event Listeners ---
 function setupEventListeners() {
-  // Mobile Drawer Toggle
+  // Mobile History Drawer Toggle
   if (sidebarMobileBtn && sidebar) {
     sidebarMobileBtn.addEventListener('click', () => {
-      sidebar.classList.add('open');
-      if (sidebarBackdrop) sidebarBackdrop.classList.add('active');
+      sidebar.classList.toggle('open');
+      if (sidebarBackdrop) sidebarBackdrop.classList.toggle('active');
+    });
+  }
+
+  if (sidebarToggle && sidebar) {
+    sidebarToggle.addEventListener('click', () => {
+      sidebar.classList.toggle('open');
+      if (sidebarBackdrop) sidebarBackdrop.classList.toggle('active');
     });
   }
 
@@ -625,19 +915,22 @@ function setupEventListeners() {
     });
   }
 
-  if (sidebarToggle && sidebar) {
-    sidebarToggle.addEventListener('click', () => {
-      sidebar.classList.toggle('collapsed');
-    });
-  }
-
   if (newChatBtn) {
     newChatBtn.addEventListener('click', createNewChat);
   }
 
+  if (plusBtn) {
+    plusBtn.addEventListener('click', createNewChat);
+  }
+
+  // Model Selector
   if (modelSelector) {
     modelSelector.addEventListener('change', () => {
       saveSettings({ defaultModel: modelSelector.value });
+      if (failoverBadge) {
+        failoverBadge.querySelector('span:last-child').textContent =
+          modelSelector.value === 'auto' ? 'Unified AI Active' : `${modelSelector.value} Selected`;
+      }
     });
   }
 
@@ -646,10 +939,11 @@ function setupEventListeners() {
     sendBtn.addEventListener('click', handleSend);
   }
 
-  if (clearInputBtn) {
+  if (clearInputBtn && promptInput) {
     clearInputBtn.addEventListener('click', () => {
       promptInput.value = '';
       promptInput.style.height = 'auto';
+      clearInputBtn.style.display = 'none';
       promptInput.focus();
     });
   }
@@ -664,44 +958,81 @@ function setupEventListeners() {
 
     promptInput.addEventListener('input', () => {
       promptInput.style.height = 'auto';
-      promptInput.style.height = Math.min(promptInput.scrollHeight, 180) + 'px';
+      promptInput.style.height = Math.min(promptInput.scrollHeight, 140) + 'px';
+      if (clearInputBtn) {
+        clearInputBtn.style.display = promptInput.value.length > 0 ? 'flex' : 'none';
+      }
     });
   }
 
-  // Modals & Passphrase Setup
-  if (openSyncModalBtn) {
-    openSyncModalBtn.addEventListener('click', () => {
-      settingsModal.style.display = 'flex';
-      settingPassphrase.focus();
+  // File Attachment Button
+  if (attachBtn && fileInput) {
+    attachBtn.addEventListener('click', () => {
+      fileInput.click();
+    });
+
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const fileContent = event.target.result;
+        promptInput.value = `[File: ${file.name}]\n${fileContent.substring(0, 1500)}\n\n` + promptInput.value;
+        promptInput.focus();
+      };
+      reader.readAsText(file);
     });
   }
 
-  if (settingsBtn) {
-    settingsBtn.addEventListener('click', () => {
-      settingsModal.style.display = 'flex';
+  // Top Nav Tabs
+  if (tabAiChat) {
+    tabAiChat.addEventListener('click', () => {
+      setActiveNavTab(tabAiChat);
+    });
+  }
+  if (tabDashboard) {
+    tabDashboard.addEventListener('click', () => {
+      setActiveNavTab(tabDashboard);
+      openSettings();
+    });
+  }
+  if (tabHelp) {
+    tabHelp.addEventListener('click', () => {
+      setActiveNavTab(tabHelp);
+      alert('FreeLLM Studio Help:\n• Default model "Unified AI" automatically chooses the fastest provider and fails over on 429 limits.\n• Click the mic icon for voice input.\n• Set a passphrase under Settings to sync chats between mobile and desktop.');
+    });
+  }
+  if (tabAccount) {
+    tabAccount.addEventListener('click', () => {
+      setActiveNavTab(tabAccount);
+      openSettings();
     });
   }
 
-  if (closeSettingsBtn) {
-    closeSettingsBtn.addEventListener('click', () => {
-      settingsModal.style.display = 'none';
-    });
+  if (userProfileBtn) {
+    userProfileBtn.addEventListener('click', openSettings);
   }
+
+  // Settings Modal
+  if (openSyncModalBtn) openSyncModalBtn.addEventListener('click', openSettings);
+  if (settingsBtn) settingsBtn.addEventListener('click', openSettings);
+  if (closeSettingsBtn) closeSettingsBtn.addEventListener('click', closeSettings);
 
   if (settingsModal) {
     settingsModal.addEventListener('click', (e) => {
-      if (e.target === settingsModal) settingsModal.style.display = 'none';
+      if (e.target === settingsModal) closeSettings();
     });
   }
 
   if (saveSettingsBtn) {
     saveSettingsBtn.addEventListener('click', () => {
       saveSettings({
-        backendUrl: settingBackendUrl.value.trim(),
-        apiKey: settingApiKey.value.trim(),
-        passphrase: settingPassphrase.value.trim(),
+        backendUrl: settingBackendUrl ? settingBackendUrl.value.trim() : '',
+        apiKey: settingApiKey ? settingApiKey.value.trim() : '',
+        passphrase: settingPassphrase ? settingPassphrase.value.trim() : '',
       });
-      settingsModal.style.display = 'none';
+      closeSettings();
       if (settings.passphrase) {
         syncChatsFromCloud();
       }
@@ -710,9 +1041,23 @@ function setupEventListeners() {
 
   if (syncNowBtn) {
     syncNowBtn.addEventListener('click', async () => {
-      saveSettings({ passphrase: settingPassphrase.value.trim() });
+      if (settingPassphrase) {
+        saveSettings({ passphrase: settingPassphrase.value.trim() });
+      }
       await syncChatsFromCloud();
       alert('Cross-device synchronization complete!');
+    });
+  }
+
+  // Reset Session
+  if (exitAppBtn) {
+    exitAppBtn.addEventListener('click', () => {
+      if (confirm('Start fresh session? This clears local chat cache.')) {
+        localStorage.removeItem(STORAGE_KEY_CHATS);
+        localStorage.removeItem(STORAGE_KEY_ACTIVE);
+        chats = [];
+        seedMockupConversation();
+      }
     });
   }
 
@@ -736,13 +1081,25 @@ function setupEventListeners() {
   }
 }
 
-function attachChipListeners() {
-  document.querySelectorAll('.chip').forEach(chip => {
-    chip.addEventListener('click', () => {
-      promptInput.value = chip.getAttribute('data-prompt');
-      handleSend();
-    });
+function setActiveNavTab(activeEl) {
+  [tabDashboard, tabAiChat, tabHelp, tabAccount].forEach(tab => {
+    if (tab) tab.classList.remove('active');
   });
+  if (activeEl) activeEl.classList.add('active');
+}
+
+function openSettings() {
+  if (settingsModal) {
+    settingsModal.style.display = 'flex';
+    if (settingPassphrase) settingPassphrase.focus();
+  }
+}
+
+function closeSettings() {
+  if (settingsModal) {
+    settingsModal.style.display = 'none';
+    if (tabAiChat) setActiveNavTab(tabAiChat);
+  }
 }
 
 function registerServiceWorker() {
